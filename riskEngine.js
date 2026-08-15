@@ -28,6 +28,18 @@ It only calculates the numbers. decisionEngine.js still
 makes the final call, including rejecting anything below
 the minimum 1:2 risk/reward.
 
+FIELD NAMES — matched to liquidityEngine.js output:
+    Liquidity pools (from buildLiquidityMap /
+    liquidityMap.buySideLiquidity / sellSideLiquidity):
+        pool.side  -> "BUY_SIDE" | "SELL_SIDE"
+        pool.price -> number
+
+    Sweeps (from detectLiquiditySweeps):
+        sweep.direction -> "BULLISH_POTENTIAL" | "BEARISH_POTENTIAL"
+        sweep.liquidityLevel -> number (always present)
+        sweep.high -> number (only on BUY_SIDE sweeps)
+        sweep.low  -> number (only on SELL_SIDE sweeps)
+
 ============================================================
 */
 
@@ -106,9 +118,12 @@ function calculateStopLoss(candidate, candles) {
             ? Math.min(...candidate.orderBlocks.map(ob => ob.low))
             : Math.max(...candidate.orderBlocks.map(ob => ob.high));
     } else if (candidate.sweep) {
+        // Sell-side sweep (bullish setup) only has .low; buy-side
+        // sweep (bearish setup) only has .high. liquidityLevel is
+        // the safe fallback either way.
         structuralExtreme = isBullish
-            ? candidate.sweep.low
-            : candidate.sweep.high;
+            ? (candidate.sweep.low ?? candidate.sweep.liquidityLevel)
+            : (candidate.sweep.high ?? candidate.sweep.liquidityLevel);
     } else {
         return null; // nothing to anchor a stop to
     }
@@ -123,7 +138,10 @@ function calculateStopLoss(candidate, candles) {
 // ============================================================
 
 /*
-    liquidityPools: full output from liquidityEngine.js
+    liquidityPools: buySideLiquidity + sellSideLiquidity from
+                    liquidityEngine.js's buildLiquidityMap() /
+                    analyzeLiquidity().liquidityMap — NOT the
+                    sweeps array, that's a different thing.
     entryPrice:     assumed entry (e.g. current close, or
                     order block edge — passed in by caller)
 */
@@ -139,9 +157,9 @@ function calculateTakeProfit(candidate, entryPrice, stopLoss, liquidityPools) {
     // bullish trade, sell-side pools below price for bearish.
     const opposingPools = (liquidityPools || []).filter(pool => {
         if (isBullish) {
-            return pool.type === "buy_side" && pool.level > entryPrice;
+            return pool.side === "BUY_SIDE" && pool.price > entryPrice;
         }
-        return pool.type === "sell_side" && pool.level < entryPrice;
+        return pool.side === "SELL_SIDE" && pool.price < entryPrice;
     });
 
     let takeProfit;
@@ -149,8 +167,8 @@ function calculateTakeProfit(candidate, entryPrice, stopLoss, liquidityPools) {
     if (opposingPools.length > 0) {
         // Nearest opposing pool = most realistic target
         takeProfit = isBullish
-            ? Math.min(...opposingPools.map(p => p.level))
-            : Math.max(...opposingPools.map(p => p.level));
+            ? Math.min(...opposingPools.map(p => p.price))
+            : Math.max(...opposingPools.map(p => p.price));
     } else {
         // No known liquidity target — fall back to fixed R multiple
         const fallbackDistance = riskDistance * RISK_ENGINE_CONFIG.fallbackRewardMultiple;
