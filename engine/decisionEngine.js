@@ -45,7 +45,23 @@ const AUREUS_CONFIG = {
     minimumRiskReward: 2.0,
 
     // Maximum number of conditions allowed to conflict
-    maximumConflicts: 2
+    maximumConflicts: 2,
+
+    // Only trade during these sessions
+    allowedSessions: ["LONDON", "NEWYORK"],
+
+    // Hard cap regardless of how good setups look
+    maxTradesPerDay: 2,
+
+    // Fixed risk per trade as a fraction of account equity
+    riskPerTrade: 0.005, // 0.5%
+
+    /*
+        TEMPORARY — remove once a real fundamentalEngine.js
+        exists. Until then we mirror technical bias so setups
+        aren't blocked forever by an unbuilt component.
+    */
+    fundamentalEngineIsPlaceholder: true
 };
 
 
@@ -302,7 +318,7 @@ function countConflicts(setup) {
 
     if (
         typeof setup.riskReward === "number" &&
-        setup.riskReward <
+        setup.riskReward 
         AUREUS_CONFIG.minimumRiskReward
     ) {
 
@@ -355,7 +371,7 @@ function determineSignal(
     */
 
     if (
-        score <
+        score 
         60
     ) {
 
@@ -368,7 +384,7 @@ function determineSignal(
     */
 
     if (
-        score <
+        score 
         AUREUS_CONFIG.minimumValidScore
     ) {
 
@@ -394,6 +410,106 @@ function determineSignal(
     */
 
     return `VALID ${direction}`;
+}
+
+
+// ============================================================
+// 9B. SESSION AND TRADE-COUNT GATES
+// ============================================================
+
+function isSessionAllowed(session) {
+    return AUREUS_CONFIG.allowedSessions.includes(session);
+}
+
+function isUnderDailyTradeLimit(tradesTakenToday) {
+    return tradesTakenToday < AUREUS_CONFIG.maxTradesPerDay;
+}
+
+
+// ============================================================
+// 9C. BRIDGE FROM entryZoneEngine.js CANDIDATES
+// ============================================================
+
+/*
+    Converts a candidate from getEntryZones() into the
+    "setup" shape analyzeSetup() expects.
+
+    context = {
+        symbol: "XAUUSD",
+        session: "LONDON" | "NEWYORK" | "ASIA" | "OTHER",
+        tradesTakenToday: 0,
+        riskReward: <number or null>,   // from SL/TP engine, not built yet
+        newsRisk: "LOW" | "HIGH"
+    }
+*/
+function buildSetupFromEntryZone(candidate, context) {
+
+    const technicalBias =
+        candidate.direction === "bullish" ? "BULLISH" : "BEARISH";
+
+    // TEMPORARY placeholder — see AUREUS_CONFIG note above
+    const fundamentalBias = AUREUS_CONFIG.fundamentalEngineIsPlaceholder
+        ? technicalBias
+        : (context.fundamentalBias || "NEUTRAL");
+
+    return {
+        symbol: context.symbol,
+        technicalBias,
+        fundamentalBias,
+        fundamentalAlignment: technicalBias === fundamentalBias,
+
+        higherTimeframeBias: context.higherTimeframeBias === true,
+        supportResistance: context.supportResistance === true,
+        supplyDemand: context.supplyDemand === true,
+
+        orderBlock: candidate.orderBlocks.length > 0,
+        fairValueGap: candidate.fvgs.length > 0,
+        liquiditySweep: true, // guaranteed by entryZoneEngine's linking logic
+        marketStructure: true, // confirmed break guaranteed by entryZoneEngine
+
+        candleConfirmation: context.candleConfirmation === true,
+
+        riskReward: context.riskReward ?? null,
+        newsRisk: context.newsRisk || "LOW",
+
+        // carried through for logging/debugging, not scored
+        breakType: candidate.breakType,
+        confluenceScore: candidate.confluenceScore,
+    };
+}
+
+/*
+    Full pipeline: entry zone candidate -> setup -> decision,
+    with the hard session/trade-count gates applied on top
+    of whatever analyzeSetup() decides.
+*/
+function evaluateEntryZone(candidate, context) {
+
+    if (!isSessionAllowed(context.session)) {
+        return {
+            symbol: context.symbol,
+            signal: "NO TRADE",
+            reason: `Outside allowed sessions (${context.session})`,
+            valid: false,
+        };
+    }
+
+    if (!isUnderDailyTradeLimit(context.tradesTakenToday)) {
+        return {
+            symbol: context.symbol,
+            signal: "NO TRADE",
+            reason: "Daily trade limit reached",
+            valid: false,
+        };
+    }
+
+    const setup = buildSetupFromEntryZone(candidate, context);
+    const result = analyzeSetup(setup);
+
+    // Position sizing, only meaningful once riskReward is real
+    result.riskPerTradePercent = AUREUS_CONFIG.riskPerTrade * 100;
+
+    return result;
 }
 
 
@@ -542,7 +658,15 @@ if (typeof module !== "undefined") {
 
         determineDirection,
 
-        determineSignal
+        determineSignal,
+
+        isSessionAllowed,
+
+        isUnderDailyTradeLimit,
+
+        buildSetupFromEntryZone,
+
+        evaluateEntryZone
 
     };
 
