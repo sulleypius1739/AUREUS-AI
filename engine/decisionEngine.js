@@ -438,7 +438,7 @@ function isUnderDailyTradeLimit(tradesTakenToday) {
         symbol: "XAUUSD",
         session: "LONDON" | "NEWYORK" | "ASIA" | "OTHER",
         tradesTakenToday: 0,
-        riskReward: <number or null>,   // from SL/TP engine, not built yet
+        riskResult: <output of riskEngine.calculateRiskForCandidate()>,
         newsRisk: "LOW" | "HIGH"
     }
 */
@@ -469,7 +469,7 @@ function buildSetupFromEntryZone(candidate, context) {
 
         candleConfirmation: context.candleConfirmation === true,
 
-        riskReward: context.riskReward ?? null,
+        riskReward: context.riskResult ? context.riskResult.riskReward : null,
         newsRisk: context.newsRisk || "LOW",
 
         // carried through for logging/debugging, not scored
@@ -499,6 +499,19 @@ function evaluateEntryZone(candidate, context) {
             symbol: context.symbol,
             signal: "NO TRADE",
             reason: "Daily trade limit reached",
+            valid: false,
+        };
+    }
+
+    // Requires the caller to have already run calculateRiskForCandidate()
+    // from riskEngine.js and attached the result as context.riskResult
+    if (!context.riskResult || !context.riskResult.valid) {
+        return {
+            symbol: context.symbol,
+            signal: "NO TRADE",
+            reason: context.riskResult
+                ? context.riskResult.reason
+                : "No risk calculation provided",
             valid: false,
         };
     }
