@@ -75,7 +75,10 @@ const ENTRY_ZONE_CONFIG = {
 
 /*
     sweeps:      output from liquidityEngine.js
+                 (sw.direction is "BULLISH_POTENTIAL" or
+                 "BEARISH_POTENTIAL" — normalized below)
     breaks:      output from structureBreakEngine.js
+                 (brk.direction is "bullish" or "bearish")
     orderBlocks: output from orderBlockEngine.js (findOrderBlocks)
     fvgs:        output from orderBlockEngine.js (findFairValueGaps)
 */
@@ -89,10 +92,20 @@ function getEntryZones(sweeps, breaks, orderBlocks, fvgs) {
         // ----------------------------------------------------
         const relatedSweep = sweeps.find(sw => {
             const distance = brk.candleIndex - sw.candleIndex;
+
+            // liquidityEngine.js sweep.direction values
+            // ("BULLISH_POTENTIAL" / "BEARISH_POTENTIAL") don't
+            // match structureBreakEngine.js break.direction
+            // values ("bullish" / "bearish") — normalize here.
+            const normalizedSweepDirection =
+                sw.direction === "BULLISH_POTENTIAL" ? "bullish" :
+                sw.direction === "BEARISH_POTENTIAL" ? "bearish" :
+                null;
+
             return (
                 distance >= 0 &&
                 distance <= ENTRY_ZONE_CONFIG.maxCandlesSweepToBreak &&
-                sw.direction === brk.direction
+                normalizedSweepDirection === brk.direction
             );
         });
 
