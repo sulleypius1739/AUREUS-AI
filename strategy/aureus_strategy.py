@@ -16,6 +16,10 @@ class AureusStrategy:
 
         self.minimum_score = minimum_score
 
+        # =====================================================
+        # AUREUS COMPONENTS
+        # =====================================================
+
         self.market_structure = MarketStructure(
             swing_length=3
         )
@@ -47,6 +51,21 @@ class AureusStrategy:
         # -----------------------------------------------------
         # MARKET STRUCTURE
         # -----------------------------------------------------
+        #
+        # This creates:
+        #
+        # swing_high
+        # swing_low
+        # confirmed_swing_high
+        # confirmed_swing_low
+        # structure
+        # structure_bias
+        #
+        # IMPORTANT:
+        # MarketStructure already handles confirmation delay.
+        # Therefore we can safely use structure_bias for each
+        # candle.
+        # -----------------------------------------------------
 
         df, bias = self.market_structure.analyze(df)
 
@@ -63,7 +82,7 @@ class AureusStrategy:
         df = self.zones.analyze(df)
 
         # -----------------------------------------------------
-        # CONFIRMATIONS
+        # CANDLE CONFIRMATIONS
         # -----------------------------------------------------
 
         df = self.confirmations.analyze(df)
@@ -71,65 +90,37 @@ class AureusStrategy:
         return df, bias
 
     # =========================================================
-    # GET CURRENT STRUCTURAL BIAS
+    # GET CURRENT BIAS
     # =========================================================
 
     def get_bias(self, df, index):
 
-        if "structure_bias" in df.columns:
-
-            bias = df.iloc[index].get(
-                "structure_bias",
-                "neutral"
-            )
-
-            if bias in [
-                "bullish",
-                "bearish"
-            ]:
-
-                return bias
-
         # -----------------------------------------------------
-        # Fallback:
+        # IMPORTANT PERFORMANCE FIX
+        # -----------------------------------------------------
         #
-        # Reconstruct the latest confirmed structure from the
-        # information available up to this candle.
+        # DO NOT loop through the DataFrame here.
+        #
+        # MarketStructure already calculated a rolling
+        # structure_bias column for every candle.
+        #
+        # We simply read the bias belonging to the current
+        # candle.
         # -----------------------------------------------------
 
-        latest_high = None
-        latest_low = None
+        if index < 0 or index >= len(df):
 
-        for i in range(index + 1):
+            return "neutral"
 
-            structure = df.iloc[i].get(
-                "structure",
-                None
-            )
+        bias = df.iloc[index]["structure_bias"]
 
-            if structure in ["HH", "LH"]:
-
-                latest_high = structure
-
-            elif structure in ["HL", "LL"]:
-
-                latest_low = structure
-
-        if (
-            latest_high == "HH"
-            and
-            latest_low == "HL"
+        if bias in (
+            "bullish",
+            "bearish",
+            "neutral"
         ):
 
-            return "bullish"
-
-        if (
-            latest_high == "LH"
-            and
-            latest_low == "LL"
-        ):
-
-            return "bearish"
+            return bias
 
         return "neutral"
 
@@ -137,22 +128,21 @@ class AureusStrategy:
     # SCORE CANDLE
     # =========================================================
 
-    def score_candle(
-        self,
-        df,
-        index
-    ):
+    def score_candle(self, df, index):
+
+        # -----------------------------------------------------
+        # Safety
+        # -----------------------------------------------------
+
+        if index < 0 or index >= len(df):
+
+            return {
+                "signal": "WAIT",
+                "score": 0,
+                "reasons": []
+            }
 
         row = df.iloc[index]
-
-        # =====================================================
-        # CURRENT STRUCTURAL BIAS
-        # =====================================================
-
-        bias = self.get_bias(
-            df,
-            index
-        )
 
         bullish_score = 0
         bearish_score = 0
@@ -161,18 +151,25 @@ class AureusStrategy:
         bearish_reasons = []
 
         # =====================================================
-        # MARKET STRUCTURE
+        # MARKET STRUCTURAL BIAS
+        # =====================================================
+        #
+        # We use the already calculated rolling bias.
+        #
+        # This is much better than recalculating it for every
+        # candle.
         # =====================================================
 
-        structure = row.get(
-            "structure",
-            None
+        bias = row.get(
+            "structure_bias",
+            "neutral"
         )
 
-        if structure in [
-            "HH",
-            "HL"
-        ]:
+        # -----------------------------------------------------
+        # Bullish structural bias
+        # -----------------------------------------------------
+
+        if bias == "bullish":
 
             bullish_score += 1
 
@@ -180,10 +177,11 @@ class AureusStrategy:
                 "Bullish market structure"
             )
 
-        elif structure in [
-            "LH",
-            "LL"
-        ]:
+        # -----------------------------------------------------
+        # Bearish structural bias
+        # -----------------------------------------------------
+
+        elif bias == "bearish":
 
             bearish_score += 1
 
@@ -192,35 +190,62 @@ class AureusStrategy:
             )
 
         # =====================================================
-        # LIQUIDITY SWEEP
-        # =====================================================
-        #
-        # This is now the CORE trigger.
-        #
-        # BUY:
-        #   sell-side liquidity must be swept.
-        #
-        # SELL:
-        #   buy-side liquidity must be swept.
-        #
-        # A trade cannot be created without this.
+        # CURRENT STRUCTURE EVENT
         # =====================================================
 
-        bullish_sweep = bool(
-            row.get(
-                "sell_side_sweep",
-                False
-            )
+        structure = row.get(
+            "structure",
+            None
         )
 
-        bearish_sweep = bool(
-            row.get(
-                "buy_side_sweep",
-                False
-            )
-        )
+        if structure == "HH":
 
-        if bullish_sweep:
+            bullish_score += 1
+
+            bullish_reasons.append(
+                "Higher high"
+            )
+
+        elif structure == "HL":
+
+            bullish_score += 1
+
+            bullish_reasons.append(
+                "Higher low"
+            )
+
+        elif structure == "LH":
+
+            bearish_score += 1
+
+            bearish_reasons.append(
+                "Lower high"
+            )
+
+        elif structure == "LL":
+
+            bearish_score += 1
+
+            bearish_reasons.append(
+                "Lower low"
+            )
+
+        # =====================================================
+        # LIQUIDITY SWEEPS
+        # =====================================================
+
+        # -----------------------------------------------------
+        # Sell-side liquidity sweep
+        #
+        # Price takes lows and closes back above.
+        #
+        # This is bullish.
+        # -----------------------------------------------------
+
+        if row.get(
+            "sell_side_sweep",
+            False
+        ):
 
             bullish_score += 2
 
@@ -228,7 +253,18 @@ class AureusStrategy:
                 "Sell-side liquidity sweep"
             )
 
-        if bearish_sweep:
+        # -----------------------------------------------------
+        # Buy-side liquidity sweep
+        #
+        # Price takes highs and closes back below.
+        #
+        # This is bearish.
+        # -----------------------------------------------------
+
+        if row.get(
+            "buy_side_sweep",
+            False
+        ):
 
             bearish_score += 2
 
@@ -237,24 +273,13 @@ class AureusStrategy:
             )
 
         # =====================================================
-        # ORDER BLOCK
+        # ORDER BLOCKS
         # =====================================================
 
-        bullish_ob = bool(
-            row.get(
-                "bullish_order_block",
-                False
-            )
-        )
-
-        bearish_ob = bool(
-            row.get(
-                "bearish_order_block",
-                False
-            )
-        )
-
-        if bullish_ob:
+        if row.get(
+            "bullish_order_block",
+            False
+        ):
 
             bullish_score += 1
 
@@ -262,7 +287,10 @@ class AureusStrategy:
                 "Bullish order block"
             )
 
-        if bearish_ob:
+        if row.get(
+            "bearish_order_block",
+            False
+        ):
 
             bearish_score += 1
 
@@ -271,24 +299,13 @@ class AureusStrategy:
             )
 
         # =====================================================
-        # FAIR VALUE GAP
+        # FAIR VALUE GAPS
         # =====================================================
 
-        bullish_fvg = bool(
-            row.get(
-                "bullish_fvg",
-                False
-            )
-        )
-
-        bearish_fvg = bool(
-            row.get(
-                "bearish_fvg",
-                False
-            )
-        )
-
-        if bullish_fvg:
+        if row.get(
+            "bullish_fvg",
+            False
+        ):
 
             bullish_score += 1
 
@@ -296,7 +313,10 @@ class AureusStrategy:
                 "Bullish fair value gap"
             )
 
-        if bearish_fvg:
+        if row.get(
+            "bearish_fvg",
+            False
+        ):
 
             bearish_score += 1
 
@@ -305,38 +325,13 @@ class AureusStrategy:
             )
 
         # =====================================================
-        # CANDLE CONFIRMATION
+        # BULLISH ENGULFING
         # =====================================================
 
-        bullish_engulfing = bool(
-            row.get(
-                "bullish_engulfing",
-                False
-            )
-        )
-
-        bearish_engulfing = bool(
-            row.get(
-                "bearish_engulfing",
-                False
-            )
-        )
-
-        bullish_rejection = bool(
-            row.get(
-                "bullish_rejection",
-                False
-            )
-        )
-
-        bearish_rejection = bool(
-            row.get(
-                "bearish_rejection",
-                False
-            )
-        )
-
-        if bullish_engulfing:
+        if row.get(
+            "bullish_engulfing",
+            False
+        ):
 
             bullish_score += 1
 
@@ -344,7 +339,14 @@ class AureusStrategy:
                 "Bullish engulfing"
             )
 
-        if bearish_engulfing:
+        # =====================================================
+        # BEARISH ENGULFING
+        # =====================================================
+
+        if row.get(
+            "bearish_engulfing",
+            False
+        ):
 
             bearish_score += 1
 
@@ -352,7 +354,14 @@ class AureusStrategy:
                 "Bearish engulfing"
             )
 
-        if bullish_rejection:
+        # =====================================================
+        # BULLISH REJECTION
+        # =====================================================
+
+        if row.get(
+            "bullish_rejection",
+            False
+        ):
 
             bullish_score += 1
 
@@ -360,7 +369,14 @@ class AureusStrategy:
                 "Bullish rejection"
             )
 
-        if bearish_rejection:
+        # =====================================================
+        # BEARISH REJECTION
+        # =====================================================
+
+        if row.get(
+            "bearish_rejection",
+            False
+        ):
 
             bearish_score += 1
 
@@ -372,21 +388,24 @@ class AureusStrategy:
         # DISPLACEMENT
         # =====================================================
 
-        displacement = bool(
-            row.get(
-                "displacement",
-                False
+        if row.get(
+            "displacement",
+            False
+        ):
+
+            close = float(
+                row["close"]
             )
-        )
 
-        bullish_displacement = False
-        bearish_displacement = False
+            open_price = float(
+                row["open"]
+            )
 
-        if displacement:
+            # -------------------------------------------------
+            # Bullish displacement
+            # -------------------------------------------------
 
-            if row["close"] > row["open"]:
-
-                bullish_displacement = True
+            if close > open_price:
 
                 bullish_score += 1
 
@@ -394,9 +413,11 @@ class AureusStrategy:
                     "Bullish displacement"
                 )
 
-            elif row["close"] < row["open"]:
+            # -------------------------------------------------
+            # Bearish displacement
+            # -------------------------------------------------
 
-                bearish_displacement = True
+            elif close < open_price:
 
                 bearish_score += 1
 
@@ -405,101 +426,43 @@ class AureusStrategy:
                 )
 
         # =====================================================
-        # CONTEXT SCORE
+        # STRUCTURAL BIAS FILTER
         # =====================================================
         #
-        # A liquidity sweep alone is not enough.
+        # This is important.
         #
-        # We want evidence that price actually reacted.
+        # AUREUS should not blindly take a BUY when the
+        # structural bias is bearish, or a SELL when it is
+        # bullish.
         #
-        # Bullish context:
-        #
-        #   order block OR FVG OR engulfing OR rejection
-        #   OR displacement
-        #
-        # Bearish context:
-        #
-        #   same idea in the opposite direction.
-        # =====================================================
+        # We therefore use structure as a directional filter.
+        # -----------------------------------------------------
 
-        bullish_context = (
-            bullish_ob
-            or
-            bullish_fvg
-            or
-            bullish_engulfing
-            or
-            bullish_rejection
-            or
-            bullish_displacement
-        )
+        if bias == "bullish":
 
-        bearish_context = (
-            bearish_ob
-            or
-            bearish_fvg
-            or
-            bearish_engulfing
-            or
-            bearish_rejection
-            or
-            bearish_displacement
-        )
+            bearish_score = 0
+            bearish_reasons = []
+
+        elif bias == "bearish":
+
+            bullish_score = 0
+            bullish_reasons = []
 
         # =====================================================
         # FINAL DECISION
         # =====================================================
-        #
-        # IMPORTANT:
-        #
-        # We no longer allow:
-        #
-        #   OB + engulfing + displacement
-        #
-        # to automatically create a trade.
-        #
-        # A liquidity event is mandatory.
-        #
-        # We also don't allow trades against structural bias.
-        # =====================================================
 
         # -----------------------------------------------------
-        # BULLISH SETUP
+        # BUY
         # -----------------------------------------------------
 
-        bullish_valid = (
+        if (
             bias == "bullish"
-            and
-            bullish_sweep
-            and
-            bullish_context
             and
             bullish_score >= self.minimum_score
             and
             bullish_score > bearish_score
-        )
-
-        # -----------------------------------------------------
-        # BEARISH SETUP
-        # -----------------------------------------------------
-
-        bearish_valid = (
-            bias == "bearish"
-            and
-            bearish_sweep
-            and
-            bearish_context
-            and
-            bearish_score >= self.minimum_score
-            and
-            bearish_score > bullish_score
-        )
-
-        # =====================================================
-        # BUY
-        # =====================================================
-
-        if bullish_valid:
+        ):
 
             return {
                 "signal": "BUY",
@@ -507,11 +470,17 @@ class AureusStrategy:
                 "reasons": bullish_reasons
             }
 
-        # =====================================================
+        # -----------------------------------------------------
         # SELL
-        # =====================================================
+        # -----------------------------------------------------
 
-        if bearish_valid:
+        if (
+            bias == "bearish"
+            and
+            bearish_score >= self.minimum_score
+            and
+            bearish_score > bullish_score
+        ):
 
             return {
                 "signal": "SELL",
@@ -519,9 +488,9 @@ class AureusStrategy:
                 "reasons": bearish_reasons
             }
 
-        # =====================================================
+        # -----------------------------------------------------
         # WAIT
-        # =====================================================
+        # -----------------------------------------------------
 
         return {
             "signal": "WAIT",
@@ -529,11 +498,10 @@ class AureusStrategy:
                 bullish_score,
                 bearish_score
             ),
-            "reasons": (
+            "reasons":
                 bullish_reasons
                 +
                 bearish_reasons
-            )
         }
 
     # =========================================================
@@ -563,22 +531,22 @@ class AureusStrategy:
     # COMPLETE ANALYSIS
     # =========================================================
 
-    def analyze(
-        self,
-        df
-    ):
+    def analyze(self, df):
 
         df, bias = self.prepare(df)
 
         signals = []
-
         scores = []
-
         reasons = []
 
-        for i in range(
-            len(df)
-        ):
+        # -----------------------------------------------------
+        # Generate signals sequentially.
+        #
+        # This is O(n), rather than repeatedly recalculating
+        # market structure.
+        # -----------------------------------------------------
+
+        for i in range(len(df)):
 
             result = self.generate_signal(
                 df,
@@ -597,16 +565,10 @@ class AureusStrategy:
                 result["reasons"]
             )
 
-        df[
-            "aureus_signal"
-        ] = signals
+        df["aureus_signal"] = signals
 
-        df[
-            "aureus_score"
-        ] = scores
+        df["aureus_score"] = scores
 
-        df[
-            "aureus_reasons"
-        ] = reasons
+        df["aureus_reasons"] = reasons
 
         return df, bias
