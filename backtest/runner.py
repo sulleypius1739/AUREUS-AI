@@ -6,6 +6,10 @@ from backtest.engine import BacktestEngine
 from backtest.metrics import calculate_metrics
 
 
+# =========================================================
+# DISPLAY HELPERS
+# =========================================================
+
 def print_section(title):
 
     print()
@@ -14,24 +18,18 @@ def print_section(title):
     print("=" * 54)
 
 
-def safe_count(df, column, value=None):
-
-    if column not in df.columns:
-        return "N/A"
-
-    if value is None:
-        return len(df[column].dropna())
-
-    return int(
-        (df[column] == value).sum()
-    )
-
+# =========================================================
+# DATA DIAGNOSTICS
+# =========================================================
 
 def print_data_diagnostics(df):
 
     print_section("DATA")
 
-    print("Candles:", len(df))
+    print(
+        "Candles:",
+        len(df)
+    )
 
     if "Date" in df.columns:
 
@@ -66,6 +64,10 @@ def print_data_diagnostics(df):
     )
 
 
+# =========================================================
+# MARKET STRUCTURE DIAGNOSTICS
+# =========================================================
+
 def print_structure_diagnostics(df):
 
     print_section("MARKET STRUCTURE")
@@ -84,7 +86,12 @@ def print_structure_diagnostics(df):
         .value_counts()
     )
 
-    for label in ["HH", "HL", "LH", "LL"]:
+    for label in [
+        "HH",
+        "HL",
+        "LH",
+        "LL"
+    ]:
 
         print(
             f"{label}:",
@@ -96,6 +103,10 @@ def print_structure_diagnostics(df):
             )
         )
 
+
+# =========================================================
+# LIQUIDITY DIAGNOSTICS
+# =========================================================
 
 def print_liquidity_diagnostics(df):
 
@@ -144,16 +155,21 @@ def print_liquidity_diagnostics(df):
 
             continue
 
-        print(
-            f"{label}:",
-            int(
-                df[column]
-                .fillna(False)
-                .astype(bool)
-                .sum()
-            )
+        values = (
+            df[column]
+            .fillna(False)
+            .astype(bool)
         )
 
+        print(
+            f"{label}:",
+            int(values.sum())
+        )
+
+
+# =========================================================
+# ZONE DIAGNOSTICS
+# =========================================================
 
 def print_zone_diagnostics(df):
 
@@ -217,16 +233,21 @@ def print_zone_diagnostics(df):
 
             continue
 
-        print(
-            f"{label}:",
-            int(
-                df[column]
-                .fillna(False)
-                .astype(bool)
-                .sum()
-            )
+        values = (
+            df[column]
+            .fillna(False)
+            .astype(bool)
         )
 
+        print(
+            f"{label}:",
+            int(values.sum())
+        )
+
+
+# =========================================================
+# SIGNAL DIAGNOSTICS
+# =========================================================
 
 def print_signal_diagnostics(df):
 
@@ -245,10 +266,13 @@ def print_signal_diagnostics(df):
         .dropna()
     )
 
-    # Remove common empty representations.
+    # Remove empty / neutral values.
 
     signals = signals[
-        ~signals.astype(str).str.lower().isin(
+        ~signals
+        .astype(str)
+        .str.lower()
+        .isin(
             [
                 "",
                 "none",
@@ -274,7 +298,10 @@ def print_signal_diagnostics(df):
         return
 
     print()
-    print("Signal breakdown:")
+
+    print(
+        "Signal breakdown:"
+    )
 
     counts = (
         signals
@@ -288,6 +315,10 @@ def print_signal_diagnostics(df):
             f"  {signal}: {count}"
         )
 
+
+# =========================================================
+# TRADE DIAGNOSTICS
+# =========================================================
 
 def print_trade_diagnostics(
     trades,
@@ -326,9 +357,14 @@ def print_trade_diagnostics(
         metrics["net_result_R"]
     )
 
-    if len(trades) == 0:
+    # ---------------------------------------------------------
+    # No trades
+    # ---------------------------------------------------------
+
+    if not trades:
 
         print()
+
         print(
             "No completed trades available "
             "for additional diagnostics."
@@ -337,7 +373,51 @@ def print_trade_diagnostics(
         return
 
     # ---------------------------------------------------------
-    # Try to identify long/short trades.
+    # Convert list of trade dictionaries into DataFrame
+    # ---------------------------------------------------------
+
+    try:
+
+        trade_df = pd.DataFrame(
+            trades
+        )
+
+    except Exception as error:
+
+        print()
+
+        print(
+            "Could not convert trades "
+            "to DataFrame:"
+        )
+
+        print(error)
+
+        return
+
+    if trade_df.empty:
+
+        print()
+
+        print(
+            "No completed trades available."
+        )
+
+        return
+
+    # ---------------------------------------------------------
+    # Show available trade fields
+    # ---------------------------------------------------------
+
+    print()
+
+    print(
+        "Trade fields:",
+        list(trade_df.columns)
+    )
+
+    # ---------------------------------------------------------
+    # Trade direction
     # ---------------------------------------------------------
 
     direction_column = None
@@ -349,7 +429,7 @@ def print_trade_diagnostics(
         "signal"
     ]:
 
-        if column in trades.columns:
+        if column in trade_df.columns:
 
             direction_column = column
 
@@ -358,7 +438,9 @@ def print_trade_diagnostics(
     if direction_column is not None:
 
         values = (
-            trades[direction_column]
+            trade_df[
+                direction_column
+            ]
             .astype(str)
             .str.lower()
         )
@@ -389,12 +471,83 @@ def print_trade_diagnostics(
             int(short_count)
         )
 
+    else:
+
+        print(
+            "Trade direction: N/A"
+        )
+
+    # ---------------------------------------------------------
+    # R statistics
+    # ---------------------------------------------------------
+
+    result_column = None
+
+    for column in [
+        "R",
+        "r",
+        "result_R",
+        "profit_R",
+        "pnl_R"
+    ]:
+
+        if column in trade_df.columns:
+
+            result_column = column
+
+            break
+
+    if result_column is not None:
+
+        numeric_results = pd.to_numeric(
+            trade_df[
+                result_column
+            ],
+            errors="coerce"
+        ).dropna()
+
+        if len(numeric_results) > 0:
+
+            print(
+                "Average R:",
+                round(
+                    numeric_results.mean(),
+                    3
+                )
+            )
+
+            print(
+                "Best trade (R):",
+                round(
+                    numeric_results.max(),
+                    3
+                )
+            )
+
+            print(
+                "Worst trade (R):",
+                round(
+                    numeric_results.min(),
+                    3
+                )
+            )
+
+    else:
+
+        print(
+            "R-result field: N/A"
+        )
+
+
+# =========================================================
+# TRADE SAMPLE
+# =========================================================
 
 def print_trade_sample(trades):
 
     print_section("TRADE SAMPLE")
 
-    if len(trades) == 0:
+    if not trades:
 
         print(
             "No trades available."
@@ -402,40 +555,81 @@ def print_trade_sample(trades):
 
         return
 
-    # Show only the first five trades so the terminal
-    # remains readable.
+    try:
+
+        trade_df = pd.DataFrame(
+            trades
+        )
+
+    except Exception as error:
+
+        print(
+            "Could not display trade sample:"
+        )
+
+        print(error)
+
+        return
+
+    if trade_df.empty:
+
+        print(
+            "No trades available."
+        )
+
+        return
 
     print(
-        trades.head(5).to_string(
+        trade_df
+        .head(5)
+        .to_string(
             index=False
         )
     )
 
+
+# =========================================================
+# MAIN
+# =========================================================
 
 def main():
 
     print()
 
     print("=" * 54)
+
     print(
         "AUREUS AI".center(54)
     )
+
     print(
         "HISTORICAL BACKTEST".center(54)
     )
+
     print("=" * 54)
 
     print()
+
+    # =====================================================
+    # FILE INPUT
+    # =====================================================
 
     file_path = input(
         "Enter CSV file path: "
     ).strip()
 
-    file_path = Path(file_path)
+    file_path = Path(
+        file_path
+    )
 
     if not file_path.exists():
 
         print()
+
+        print_section(
+            "BACKTEST ERROR"
+        )
+
         print(
             "ERROR: File does not exist."
         )
@@ -446,6 +640,10 @@ def main():
 
         return
 
+    # =====================================================
+    # LOAD DATA
+    # =====================================================
+
     try:
 
         df = pd.read_csv(
@@ -455,6 +653,7 @@ def main():
     except Exception as error:
 
         print()
+
         print_section(
             "BACKTEST ERROR"
         )
@@ -463,7 +662,9 @@ def main():
             "Could not read CSV."
         )
 
-        print(error)
+        print(
+            error
+        )
 
         return
 
@@ -473,11 +674,13 @@ def main():
         "Data loaded successfully."
     )
 
-    print_data_diagnostics(df)
+    print_data_diagnostics(
+        df
+    )
 
-    # =========================================================
-    # ENGINE
-    # =========================================================
+    # =====================================================
+    # CREATE ENGINE
+    # =====================================================
 
     engine = BacktestEngine(
 
@@ -490,9 +693,9 @@ def main():
         minimum_score=3
     )
 
-    # =========================================================
+    # =====================================================
     # RUN BACKTEST
-    # =========================================================
+    # =====================================================
 
     try:
 
@@ -510,13 +713,15 @@ def main():
             type(error).__name__ + ":"
         )
 
-        print(error)
+        print(
+            error
+        )
 
         return
 
-    # =========================================================
-    # METRICS
-    # =========================================================
+    # =====================================================
+    # CALCULATE METRICS
+    # =====================================================
 
     try:
 
@@ -530,13 +735,15 @@ def main():
             "METRICS ERROR"
         )
 
-        print(error)
+        print(
+            error
+        )
 
         return
 
-    # =========================================================
-    # RESULTS
-    # =========================================================
+    # =====================================================
+    # MAIN RESULTS
+    # =====================================================
 
     print_section(
         "AUREUS RESULTS"
@@ -547,51 +754,67 @@ def main():
         bias
     )
 
+    # =====================================================
+    # TRADE PERFORMANCE
+    # =====================================================
+
     print_trade_diagnostics(
         trades,
         metrics
     )
 
-    # =========================================================
-    # DIAGNOSTICS
-    # =========================================================
-
-    print_data_diagnostics(
-        analysed_data
-    )
+    # =====================================================
+    # MARKET STRUCTURE
+    # =====================================================
 
     print_structure_diagnostics(
         analysed_data
     )
 
+    # =====================================================
+    # LIQUIDITY
+    # =====================================================
+
     print_liquidity_diagnostics(
         analysed_data
     )
+
+    # =====================================================
+    # ZONES
+    # =====================================================
 
     print_zone_diagnostics(
         analysed_data
     )
 
+    # =====================================================
+    # SIGNALS
+    # =====================================================
+
     print_signal_diagnostics(
         analysed_data
     )
 
-    # =========================================================
-    # SAMPLE
-    # =========================================================
+    # =====================================================
+    # SAMPLE TRADES
+    # =====================================================
 
     print_trade_sample(
         trades
     )
 
-    # =========================================================
+    # =====================================================
     # COMPLETE
-    # =========================================================
+    # =====================================================
 
     print_section(
         "BACKTEST COMPLETE"
     )
 
+
+# =========================================================
+# PROGRAM ENTRY
+# =========================================================
 
 if __name__ == "__main__":
 
