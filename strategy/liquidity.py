@@ -1,39 +1,24 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 
 
 class LiquidityAnalyzer:
-    """
-    AUREUS Liquidity Analyzer
-
-    Detects:
-
-        - Equal highs
-        - Equal lows
-        - Buy-side liquidity
-        - Sell-side liquidity
-        - Buy-side liquidity sweeps
-        - Sell-side liquidity sweeps
-
-    IMPORTANT
-    =========
-    Liquidity is created from CONFIRMED swing points.
-
-    A liquidity level cannot be swept on the same candle on which
-    it is created.
-
-    This is deliberately causal so the backtester cannot use
-    information that would not have existed at that point in
-    historical time.
-    """
 
     def __init__(
         self,
         swing_lookback=3,
-        equal_tolerance=0.0002,
-        minimum_separation=3,
-        liquidity_expiry=100
+        equal_tolerance=0.0002
     ):
+
+        if swing_lookback < 1:
+            raise ValueError(
+                "swing_lookback must be >= 1"
+            )
+
+        if equal_tolerance < 0:
+            raise ValueError(
+                "equal_tolerance must be >= 0"
+            )
 
         self.swing_lookback = int(
             swing_lookback
@@ -41,14 +26,6 @@ class LiquidityAnalyzer:
 
         self.equal_tolerance = float(
             equal_tolerance
-        )
-
-        self.minimum_separation = int(
-            minimum_separation
-        )
-
-        self.liquidity_expiry = int(
-            liquidity_expiry
         )
 
     # =========================================================
@@ -65,958 +42,415 @@ class LiquidityAnalyzer:
             "buy_side_liquidity",
             "sell_side_liquidity",
             "buy_side_sweep",
-            "sell_side_sweep",
-            "liquidity_level_high",
-            "liquidity_level_low"
+            "sell_side_sweep"
         ]
 
         for column in columns:
 
             if column not in df.columns:
 
-                if (
-                    column
-                    in [
-                        "liquidity_level_high",
-                        "liquidity_level_low"
-                    ]
-                ):
-
-                    df[column] = np.nan
-
-                else:
-
-                    df[column] = False
+                df[column] = False
 
         return df
 
     # =========================================================
-    # PRICE EQUALITY
-    # =========================================================
-
-    def _prices_are_equal(
-        self,
-        price1,
-        price2
-    ):
-
-        if (
-            price1 is None
-            or
-            price2 is None
-        ):
-
-            return False
-
-        if (
-            pd.isna(price1)
-            or
-            pd.isna(price2)
-        ):
-
-            return False
-
-        price1 = float(price1)
-        price2 = float(price2)
-
-        difference = abs(
-            price1
-            -
-            price2
-        )
-
-        reference = max(
-            abs(price1),
-            abs(price2),
-            1e-12
-        )
-
-        relative_difference = (
-            difference
-            /
-            reference
-        )
-
-        return (
-            relative_difference
-            <=
-            self.equal_tolerance
-        )
-
-    # =========================================================
-    # ENSURE CONFIRMED SWINGS EXIST
-    # =========================================================
-
-    def _ensure_swing_columns(self, df):
-
-        df = df.copy()
-
-        # -----------------------------------------------------
-        # Preferred canonical columns from MarketStructure.
-        # -----------------------------------------------------
-
-        if (
-            "confirmed_swing_high"
-            in df.columns
-            and
-            "confirmed_swing_low"
-            in df.columns
-        ):
-
-            return df
-
-        # -----------------------------------------------------
-        # Compatibility with the alternate naming convention
-        # that existed in the damaged version.
-        # -----------------------------------------------------
-
-        if (
-            "swing_high_confirmed"
-            in df.columns
-        ):
-
-            df[
-                "confirmed_swing_high"
-            ] = df[
-                "swing_high_confirmed"
-            ]
-
-        if (
-            "swing_low_confirmed"
-            in df.columns
-        ):
-
-            df[
-                "confirmed_swing_low"
-            ] = df[
-                "swing_low_confirmed"
-            ]
-
-        # -----------------------------------------------------
-        # If MarketStructure was not run, create causal
-        # fallback swings.
-        #
-        # This should normally NOT be necessary.
-        # -----------------------------------------------------
-
-        if (
-            "confirmed_swing_high"
-            not in df.columns
-            or
-            "confirmed_swing_low"
-            not in df.columns
-        ):
-
-            df = self._create_fallback_swings(
-                df
-            )
-
-        return df
-
-    # =========================================================
-    # FALLBACK SWINGS
-    # =========================================================
-
-    def _create_fallback_swings(self, df):
-
-        df = df.copy()
-
-        n = self.swing_lookback
-        length = len(df)
-
-        highs = df[
-            "high"
-        ].to_numpy(
-            dtype=float
-        )
-
-        lows = df[
-            "low"
-        ].to_numpy(
-            dtype=float
-        )
-
-        confirmed_high = np.zeros(
-            length,
-            dtype=bool
-        )
-
-        confirmed_low = np.zeros(
-            length,
-            dtype=bool
-        )
-
-        for i in range(
-            n,
-            length - n
-        ):
-
-            high_is_swing = (
-                highs[i]
-                >
-                highs[
-                    i - n:i
-                ].max()
-                and
-                highs[i]
-                >
-                highs[
-                    i + 1:i + n + 1
-                ].max()
-            )
-
-            low_is_swing = (
-                lows[i]
-                <
-                lows[
-                    i - n:i
-                ].min()
-                and
-                lows[i]
-                <
-                lows[
-                    i + 1:i + n + 1
-                ].min()
-            )
-
-            confirmation_index = (
-                i + n
-            )
-
-            if (
-                high_is_swing
-                and
-                confirmation_index < length
-            ):
-
-                confirmed_high[
-                    confirmation_index
-                ] = True
-
-            if (
-                low_is_swing
-                and
-                confirmation_index < length
-            ):
-
-                confirmed_low[
-                    confirmation_index
-                ] = True
-
-        df[
-            "confirmed_swing_high"
-        ] = confirmed_high
-
-        df[
-            "confirmed_swing_low"
-        ] = confirmed_low
-
-        return df
-
-    # =========================================================
-    # FIND EQUAL HIGHS
+    # EQUAL HIGHS
     # =========================================================
 
     def find_equal_highs(self, df):
 
         df = df.copy()
 
-        df = self._ensure_swing_columns(
-            df
-        )
-
-        length = len(df)
+        highs = pd.to_numeric(
+            df["high"],
+            errors="coerce"
+        ).to_numpy(dtype=float)
 
         equal_high = np.zeros(
-            length,
+            len(df),
             dtype=bool
         )
 
-        buy_side_liquidity = np.zeros(
-            length,
-            dtype=bool
-        )
+        lookback = self.swing_lookback
 
-        liquidity_level_high = np.full(
-            length,
-            np.nan
-        )
+        tolerance = self.equal_tolerance
 
-        confirmed_highs = df[
-            "confirmed_swing_high"
-        ].to_numpy(
-            dtype=bool
-        )
-
-        # -----------------------------------------------------
-        # Prefer the actual swing price saved by
-        # MarketStructure.
-        # -----------------------------------------------------
-
-        if (
-            "swing_high_price"
-            in df.columns
+        for i in range(
+            lookback,
+            len(df)
         ):
 
-            swing_prices = df[
-                "swing_high_price"
-            ].to_numpy(
-                dtype=float
-            )
+            current_high = highs[i]
 
-        else:
+            if not np.isfinite(
+                current_high
+            ):
+                continue
 
-            swing_prices = np.full(
-                length,
-                np.nan
-            )
-
-            highs = df[
-                "high"
-            ].to_numpy(
-                dtype=float
-            )
-
-            for i in range(length):
-
-                if confirmed_highs[i]:
-
-                    swing_index = max(
-                        0,
-                        i - self.swing_lookback
-                    )
-
-                    swing_prices[i] = (
-                        highs[
-                            swing_index
-                        ]
-                    )
-
-        previous_highs = []
-
-        active_liquidity = None
-
-        # =====================================================
-        # WALK FORWARD
-        # =====================================================
-
-        for i in range(length):
-
-            # -------------------------------------------------
-            # Remove expired reference swings.
-            # -------------------------------------------------
-
-            previous_highs = [
-                item
-                for item in previous_highs
-                if (
-                    i - item[0]
-                    <=
-                    self.liquidity_expiry
-                )
+            previous_highs = highs[
+                i - lookback:i
             ]
 
-            # -------------------------------------------------
-            # New confirmed swing high
-            # -------------------------------------------------
-
-            if confirmed_highs[i]:
-
-                swing_price = (
-                    swing_prices[i]
-                )
-
-                if not np.isnan(
-                    swing_price
-                ):
-
-                    matching_level = None
-
-                    # -----------------------------------------
-                    # Search previous confirmed swing highs.
-                    # -----------------------------------------
-
-                    for (
-                        previous_index,
-                        previous_price
-                    ) in reversed(
+            valid_previous = (
+                previous_highs[
+                    np.isfinite(
                         previous_highs
-                    ):
-
-                        if (
-                            i - previous_index
-                            <
-                            self.minimum_separation
-                        ):
-
-                            continue
-
-                        if self._prices_are_equal(
-                            swing_price,
-                            previous_price
-                        ):
-
-                            matching_level = (
-                                (
-                                    swing_price
-                                    +
-                                    previous_price
-                                )
-                                /
-                                2.0
-                            )
-
-                            break
-
-                    # -----------------------------------------
-                    # Equal high found.
-                    # -----------------------------------------
-
-                    if (
-                        matching_level
-                        is not None
-                    ):
-
-                        equal_high[i] = True
-
-                        buy_side_liquidity[i] = True
-
-                        active_liquidity = {
-                            "price": matching_level,
-                            "created_at": i
-                        }
-
-                        liquidity_level_high[i] = (
-                            matching_level
-                        )
-
-                    # -----------------------------------------
-                    # Save this confirmed swing for future
-                    # comparisons.
-                    # -----------------------------------------
-
-                    previous_highs.append(
-                        (
-                            i,
-                            swing_price
-                        )
                     )
+                ]
+            )
 
-            # -------------------------------------------------
-            # Propagate active liquidity level.
-            # -------------------------------------------------
+            if len(valid_previous) == 0:
+                continue
 
-            if (
-                active_liquidity
-                is not None
+            difference = np.abs(
+                valid_previous
+                -
+                current_high
+            )
+
+            relative_difference = (
+                difference
+                /
+                max(
+                    abs(current_high),
+                    1e-12
+                )
+            )
+
+            if np.any(
+                relative_difference
+                <=
+                tolerance
             ):
 
-                age = (
-                    i
-                    -
-                    active_liquidity[
-                        "created_at"
-                    ]
-                )
+                equal_high[i] = True
 
-                if (
-                    age
-                    <=
-                    self.liquidity_expiry
-                ):
-
-                    if np.isnan(
-                        liquidity_level_high[i]
-                    ):
-
-                        liquidity_level_high[i] = (
-                            active_liquidity[
-                                "price"
-                            ]
-                        )
-
-                else:
-
-                    active_liquidity = None
-
-        df[
-            "equal_high"
-        ] = equal_high
-
-        df[
-            "buy_side_liquidity"
-        ] = buy_side_liquidity
-
-        df[
-            "liquidity_level_high"
-        ] = liquidity_level_high
+        df["equal_high"] = (
+            equal_high
+        )
 
         return df
 
     # =========================================================
-    # FIND EQUAL LOWS
+    # EQUAL LOWS
     # =========================================================
 
     def find_equal_lows(self, df):
 
         df = df.copy()
 
-        df = self._ensure_swing_columns(
-            df
-        )
-
-        length = len(df)
+        lows = pd.to_numeric(
+            df["low"],
+            errors="coerce"
+        ).to_numpy(dtype=float)
 
         equal_low = np.zeros(
-            length,
+            len(df),
             dtype=bool
         )
 
-        sell_side_liquidity = np.zeros(
-            length,
-            dtype=bool
-        )
+        lookback = self.swing_lookback
 
-        liquidity_level_low = np.full(
-            length,
-            np.nan
-        )
+        tolerance = self.equal_tolerance
 
-        confirmed_lows = df[
-            "confirmed_swing_low"
-        ].to_numpy(
-            dtype=bool
-        )
-
-        if (
-            "swing_low_price"
-            in df.columns
+        for i in range(
+            lookback,
+            len(df)
         ):
 
-            swing_prices = df[
-                "swing_low_price"
-            ].to_numpy(
-                dtype=float
-            )
+            current_low = lows[i]
 
-        else:
+            if not np.isfinite(
+                current_low
+            ):
+                continue
 
-            swing_prices = np.full(
-                length,
-                np.nan
-            )
-
-            lows = df[
-                "low"
-            ].to_numpy(
-                dtype=float
-            )
-
-            for i in range(length):
-
-                if confirmed_lows[i]:
-
-                    swing_index = max(
-                        0,
-                        i - self.swing_lookback
-                    )
-
-                    swing_prices[i] = (
-                        lows[
-                            swing_index
-                        ]
-                    )
-
-        previous_lows = []
-
-        active_liquidity = None
-
-        # =====================================================
-        # WALK FORWARD
-        # =====================================================
-
-        for i in range(length):
-
-            previous_lows = [
-                item
-                for item in previous_lows
-                if (
-                    i - item[0]
-                    <=
-                    self.liquidity_expiry
-                )
+            previous_lows = lows[
+                i - lookback:i
             ]
 
-            # -------------------------------------------------
-            # New confirmed swing low
-            # -------------------------------------------------
+            valid_previous = (
+                previous_lows[
+                    np.isfinite(
+                        previous_lows
+                    )
+                ]
+            )
 
-            if confirmed_lows[i]:
+            if len(valid_previous) == 0:
+                continue
 
-                swing_price = (
-                    swing_prices[i]
+            difference = np.abs(
+                valid_previous
+                -
+                current_low
+            )
+
+            relative_difference = (
+                difference
+                /
+                max(
+                    abs(current_low),
+                    1e-12
                 )
+            )
 
-                if not np.isnan(
-                    swing_price
+            if np.any(
+                relative_difference
+                <=
+                tolerance
+            ):
+
+                equal_low[i] = True
+
+        df["equal_low"] = (
+            equal_low
+        )
+
+        return df
+
+    # =========================================================
+    # BUY-SIDE LIQUIDITY
+    # =========================================================
+
+    def identify_buy_side_liquidity(
+        self,
+        df
+    ):
+
+        df = df.copy()
+
+        df["buy_side_liquidity"] = (
+            df["equal_high"]
+            .astype(bool)
+        )
+
+        return df
+
+    # =========================================================
+    # SELL-SIDE LIQUIDITY
+    # =========================================================
+
+    def identify_sell_side_liquidity(
+        self,
+        df
+    ):
+
+        df = df.copy()
+
+        df["sell_side_liquidity"] = (
+            df["equal_low"]
+            .astype(bool)
+        )
+
+        return df
+
+    # =========================================================
+    # BUY-SIDE LIQUIDITY SWEEP
+    # =========================================================
+    #
+    # Buy-side liquidity sits above highs.
+    #
+    # A bearish buy-side sweep occurs when:
+    #
+    # 1. Price trades ABOVE the liquidity level.
+    # 2. The candle CLOSES BACK BELOW the level.
+    #
+    # This prevents simply calling every breakout a sweep.
+    # =========================================================
+
+    def detect_buy_side_sweeps(
+        self,
+        df
+    ):
+
+        df = df.copy()
+
+        highs = pd.to_numeric(
+            df["high"],
+            errors="coerce"
+        ).to_numpy(dtype=float)
+
+        closes = pd.to_numeric(
+            df["close"],
+            errors="coerce"
+        ).to_numpy(dtype=float)
+
+        equal_highs = (
+            df["equal_high"]
+            .to_numpy(dtype=bool)
+        )
+
+        sweeps = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        last_liquidity_high = None
+
+        for i in range(
+            len(df)
+        ):
+
+            # -------------------------------------------------
+            # Register new liquidity
+            # -------------------------------------------------
+
+            if equal_highs[i]:
+
+                if np.isfinite(
+                    highs[i]
                 ):
 
-                    matching_level = None
-
-                    for (
-                        previous_index,
-                        previous_price
-                    ) in reversed(
-                        previous_lows
-                    ):
-
-                        if (
-                            i - previous_index
-                            <
-                            self.minimum_separation
-                        ):
-
-                            continue
-
-                        if self._prices_are_equal(
-                            swing_price,
-                            previous_price
-                        ):
-
-                            matching_level = (
-                                (
-                                    swing_price
-                                    +
-                                    previous_price
-                                )
-                                /
-                                2.0
-                            )
-
-                            break
-
-                    # -----------------------------------------
-                    # Equal low found.
-                    # -----------------------------------------
-
-                    if (
-                        matching_level
-                        is not None
-                    ):
-
-                        equal_low[i] = True
-
-                        sell_side_liquidity[i] = True
-
-                        active_liquidity = {
-                            "price": matching_level,
-                            "created_at": i
-                        }
-
-                        liquidity_level_low[i] = (
-                            matching_level
-                        )
-
-                    previous_lows.append(
-                        (
-                            i,
-                            swing_price
-                        )
+                    last_liquidity_high = (
+                        highs[i]
                     )
 
+                # Do not allow the same candle that creates
+                # liquidity to immediately sweep itself.
+                continue
+
             # -------------------------------------------------
-            # Propagate active liquidity.
+            # Test for sweep
             # -------------------------------------------------
 
             if (
-                active_liquidity
+                last_liquidity_high
                 is not None
+                and
+                np.isfinite(highs[i])
+                and
+                np.isfinite(closes[i])
             ):
 
-                age = (
-                    i
-                    -
-                    active_liquidity[
-                        "created_at"
-                    ]
+                swept_above = (
+                    highs[i]
+                    >
+                    last_liquidity_high
+                )
+
+                closed_back_below = (
+                    closes[i]
+                    <
+                    last_liquidity_high
                 )
 
                 if (
-                    age
-                    <=
-                    self.liquidity_expiry
+                    swept_above
+                    and
+                    closed_back_below
                 ):
 
-                    if np.isnan(
-                        liquidity_level_low[i]
-                    ):
+                    sweeps[i] = True
 
-                        liquidity_level_low[i] = (
-                            active_liquidity[
-                                "price"
-                            ]
-                        )
+                    last_liquidity_high = None
 
-                else:
-
-                    active_liquidity = None
-
-        df[
-            "equal_low"
-        ] = equal_low
-
-        df[
-            "sell_side_liquidity"
-        ] = sell_side_liquidity
-
-        df[
-            "liquidity_level_low"
-        ] = liquidity_level_low
+        df["buy_side_sweep"] = (
+            sweeps
+        )
 
         return df
 
     # =========================================================
-    # BUY-SIDE LIQUIDITY SWEEPS
+    # SELL-SIDE LIQUIDITY SWEEP
+    # =========================================================
+    #
+    # Sell-side liquidity sits below lows.
+    #
+    # A bullish sell-side sweep occurs when:
+    #
+    # 1. Price trades BELOW the liquidity level.
+    # 2. The candle CLOSES BACK ABOVE the level.
     # =========================================================
 
-    def detect_buy_side_sweeps(self, df):
+    def detect_sell_side_sweeps(
+        self,
+        df
+    ):
 
         df = df.copy()
 
-        highs = df[
-            "high"
-        ].to_numpy(
-            dtype=float
-        )
+        lows = pd.to_numeric(
+            df["low"],
+            errors="coerce"
+        ).to_numpy(dtype=float)
 
-        closes = df[
-            "close"
-        ].to_numpy(
-            dtype=float
-        )
+        closes = pd.to_numeric(
+            df["close"],
+            errors="coerce"
+        ).to_numpy(dtype=float)
 
-        levels = df[
-            "liquidity_level_high"
-        ].to_numpy()
+        equal_lows = (
+            df["equal_low"]
+            .to_numpy(dtype=bool)
+        )
 
         sweeps = np.zeros(
             len(df),
             dtype=bool
         )
 
-        active_level = None
-        level_created_at = None
+        last_liquidity_low = None
 
-        # =====================================================
-        # WALK FORWARD
-        # =====================================================
-
-        for i in range(len(df)):
-
-            current_level = levels[i]
+        for i in range(
+            len(df)
+        ):
 
             # -------------------------------------------------
-            # Activate a NEW level.
-            #
-            # It cannot be swept on this same candle.
+            # Register new liquidity
+            # -------------------------------------------------
+
+            if equal_lows[i]:
+
+                if np.isfinite(
+                    lows[i]
+                ):
+
+                    last_liquidity_low = (
+                        lows[i]
+                    )
+
+                # Do not allow the same candle to sweep itself.
+                continue
+
+            # -------------------------------------------------
+            # Test for sweep
             # -------------------------------------------------
 
             if (
-                not pd.isna(
-                    current_level
-                )
+                last_liquidity_low
+                is not None
                 and
-                active_level is None
+                np.isfinite(lows[i])
+                and
+                np.isfinite(closes[i])
             ):
 
-                active_level = float(
-                    current_level
+                swept_below = (
+                    lows[i]
+                    <
+                    last_liquidity_low
                 )
 
-                level_created_at = i
+                closed_back_above = (
+                    closes[i]
+                    >
+                    last_liquidity_low
+                )
 
-                continue
+                if (
+                    swept_below
+                    and
+                    closed_back_above
+                ):
 
-            # -------------------------------------------------
-            # Need a previously established level.
-            # -------------------------------------------------
+                    sweeps[i] = True
 
-            if (
-                active_level
-                is None
-                or
-                level_created_at
-                is None
-            ):
+                    last_liquidity_low = None
 
-                continue
-
-            # -------------------------------------------------
-            # Expiry.
-            # -------------------------------------------------
-
-            age = (
-                i
-                -
-                level_created_at
-            )
-
-            if (
-                age
-                >
-                self.liquidity_expiry
-            ):
-
-                active_level = None
-                level_created_at = None
-
-                continue
-
-            # -------------------------------------------------
-            # BUY-SIDE SWEEP
-            #
-            # Price trades ABOVE the level and closes BELOW it.
-            # -------------------------------------------------
-
-            if (
-                highs[i]
-                >
-                active_level
-                and
-                closes[i]
-                <
-                active_level
-            ):
-
-                sweeps[i] = True
-
-                # Level has been consumed.
-                active_level = None
-                level_created_at = None
-
-        df[
-            "buy_side_sweep"
-        ] = sweeps
-
-        return df
-
-    # =========================================================
-    # SELL-SIDE LIQUIDITY SWEEPS
-    # =========================================================
-
-    def detect_sell_side_sweeps(self, df):
-
-        df = df.copy()
-
-        lows = df[
-            "low"
-        ].to_numpy(
-            dtype=float
+        df["sell_side_sweep"] = (
+            sweeps
         )
-
-        closes = df[
-            "close"
-        ].to_numpy(
-            dtype=float
-        )
-
-        levels = df[
-            "liquidity_level_low"
-        ].to_numpy()
-
-        sweeps = np.zeros(
-            len(df),
-            dtype=bool
-        )
-
-        active_level = None
-        level_created_at = None
-
-        # =====================================================
-        # WALK FORWARD
-        # =====================================================
-
-        for i in range(len(df)):
-
-            current_level = levels[i]
-
-            # -------------------------------------------------
-            # Activate new level.
-            #
-            # Cannot be swept on creation candle.
-            # -------------------------------------------------
-
-            if (
-                not pd.isna(
-                    current_level
-                )
-                and
-                active_level is None
-            ):
-
-                active_level = float(
-                    current_level
-                )
-
-                level_created_at = i
-
-                continue
-
-            if (
-                active_level
-                is None
-                or
-                level_created_at
-                is None
-            ):
-
-                continue
-
-            # -------------------------------------------------
-            # Expiry.
-            # -------------------------------------------------
-
-            age = (
-                i
-                -
-                level_created_at
-            )
-
-            if (
-                age
-                >
-                self.liquidity_expiry
-            ):
-
-                active_level = None
-                level_created_at = None
-
-                continue
-
-            # -------------------------------------------------
-            # SELL-SIDE SWEEP
-            #
-            # Price trades BELOW the level and closes ABOVE it.
-            # -------------------------------------------------
-
-            if (
-                lows[i]
-                <
-                active_level
-                and
-                closes[i]
-                >
-                active_level
-            ):
-
-                sweeps[i] = True
-
-                active_level = None
-                level_created_at = None
-
-        df[
-            "sell_side_sweep"
-        ] = sweeps
 
         return df
 
@@ -1026,38 +460,48 @@ class LiquidityAnalyzer:
 
     def analyze(self, df):
 
+        df = df.copy()
+
+        required_columns = [
+            "high",
+            "low",
+            "close"
+        ]
+
+        missing = [
+            column
+            for column in required_columns
+            if column not in df.columns
+        ]
+
+        if missing:
+
+            raise ValueError(
+                "Missing required liquidity "
+                "columns: "
+                +
+                ", ".join(missing)
+            )
+
         df = self.add_columns(
             df
         )
-
-        # -----------------------------------------------------
-        # Make sure MarketStructure's confirmed swing columns
-        # are available.
-        # -----------------------------------------------------
-
-        df = self._ensure_swing_columns(
-            df
-        )
-
-        # -----------------------------------------------------
-        # Detect equal highs / buy-side liquidity.
-        # -----------------------------------------------------
 
         df = self.find_equal_highs(
             df
         )
 
-        # -----------------------------------------------------
-        # Detect equal lows / sell-side liquidity.
-        # -----------------------------------------------------
-
         df = self.find_equal_lows(
             df
         )
 
-        # -----------------------------------------------------
-        # Detect sweeps.
-        # -----------------------------------------------------
+        df = self.identify_buy_side_liquidity(
+            df
+        )
+
+        df = self.identify_sell_side_liquidity(
+            df
+        )
 
         df = self.detect_buy_side_sweeps(
             df
