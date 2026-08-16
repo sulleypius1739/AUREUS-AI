@@ -1,95 +1,35 @@
+import pandas as pd
 import numpy as np
 
 
 class MarketStructure:
-    """
-    AUREUS Market Structure Analyzer
-
-    Detects:
-
-        - Swing highs
-        - Swing lows
-        - Confirmed swing highs
-        - Confirmed swing lows
-        - HH = Higher High
-        - HL = Higher Low
-        - LH = Lower High
-        - LL = Lower Low
-        - Rolling structural bias
-
-    IMPORTANT
-    =========
-    A swing at candle i requires `swing_length` candles AFTER
-    candle i before it can be confirmed.
-
-    Example with swing_length = 3:
-
-        Actual swing:       candle 100
-        Confirmation:       candle 103
-
-    Therefore the strategy is only allowed to use the swing
-    from candle 103 onward.
-
-    This prevents future-information leakage.
-    """
 
     def __init__(self, swing_length=3):
-
         if swing_length < 1:
-            raise ValueError(
-                "swing_length must be >= 1"
-            )
+            raise ValueError("swing_length must be >= 1")
 
-        self.swing_length = int(
-            swing_length
-        )
+        self.swing_length = int(swing_length)
 
     # =========================================================
-    # DETECT SWINGS
+    # DETECT SWING HIGHS / LOWS
     # =========================================================
 
     def detect_swings(self, df):
 
         df = df.copy()
 
-        required = [
-            "high",
-            "low"
-        ]
-
-        missing = [
-            column
-            for column in required
-            if column not in df.columns
-        ]
-
-        if missing:
-            raise ValueError(
-                "Missing required market structure columns: "
-                + ", ".join(missing)
-            )
-
         n = self.swing_length
         length = len(df)
 
-        highs = df[
-            "high"
-        ].to_numpy(
-            dtype=float
-        )
+        highs = pd.to_numeric(
+            df["high"],
+            errors="coerce"
+        ).to_numpy(dtype=float)
 
-        lows = df[
-            "low"
-        ].to_numpy(
-            dtype=float
-        )
-
-        # -----------------------------------------------------
-        # Anchor/event columns
-        #
-        # These identify where the swing actually occurred.
-        # They are NOT causal trading signals.
-        # -----------------------------------------------------
+        lows = pd.to_numeric(
+            df["low"],
+            errors="coerce"
+        ).to_numpy(dtype=float)
 
         swing_high = np.zeros(
             length,
@@ -101,27 +41,15 @@ class MarketStructure:
             dtype=bool
         )
 
-        # -----------------------------------------------------
-        # Confirmation columns
-        #
-        # These identify when the swing becomes known.
-        # These ARE the columns downstream modules should use.
-        # -----------------------------------------------------
-
-        confirmed_swing_high = np.zeros(
+        swing_high_confirmed = np.zeros(
             length,
             dtype=bool
         )
 
-        confirmed_swing_low = np.zeros(
+        swing_low_confirmed = np.zeros(
             length,
             dtype=bool
         )
-
-        # -----------------------------------------------------
-        # Store the original swing price at the confirmation
-        # candle.
-        # -----------------------------------------------------
 
         swing_high_price = np.full(
             length,
@@ -133,9 +61,17 @@ class MarketStructure:
             np.nan
         )
 
-        # =====================================================
-        # FIND CANDIDATE SWINGS
-        # =====================================================
+        # -----------------------------------------------------
+        # A swing at candle i is only known at i + n.
+        #
+        # Example with swing_length = 3:
+        #
+        # actual swing:       candle 100
+        # confirmation:       candle 103
+        #
+        # Therefore all trading logic must use the confirmed
+        # columns, NOT swing_high/swing_low at the anchor.
+        # -----------------------------------------------------
 
         for i in range(
             n,
@@ -144,21 +80,11 @@ class MarketStructure:
 
             current_high = highs[i]
 
-            current_low = lows[i]
-
-            left_high = highs[
+            left_highs = highs[
                 i - n:i
             ]
 
-            right_high = highs[
-                i + 1:i + n + 1
-            ]
-
-            left_low = lows[
-                i - n:i
-            ]
-
-            right_low = lows[
+            right_highs = highs[
                 i + 1:i + n + 1
             ]
 
@@ -167,24 +93,24 @@ class MarketStructure:
             # -------------------------------------------------
 
             if (
-                current_high
-                >
-                left_high.max()
+                np.isfinite(current_high)
                 and
-                current_high
-                >
-                right_high.max()
+                len(left_highs) == n
+                and
+                len(right_highs) == n
+                and
+                current_high > np.max(left_highs)
+                and
+                current_high > np.max(right_highs)
             ):
 
                 swing_high[i] = True
 
-                confirmation_index = (
-                    i + n
-                )
+                confirmation_index = i + n
 
                 if confirmation_index < length:
 
-                    confirmed_swing_high[
+                    swing_high_confirmed[
                         confirmation_index
                     ] = True
 
@@ -196,25 +122,35 @@ class MarketStructure:
             # SWING LOW
             # -------------------------------------------------
 
+            current_low = lows[i]
+
+            left_lows = lows[
+                i - n:i
+            ]
+
+            right_lows = lows[
+                i + 1:i + n + 1
+            ]
+
             if (
-                current_low
-                <
-                left_low.min()
+                np.isfinite(current_low)
                 and
-                current_low
-                <
-                right_low.min()
+                len(left_lows) == n
+                and
+                len(right_lows) == n
+                and
+                current_low < np.min(left_lows)
+                and
+                current_low < np.min(right_lows)
             ):
 
                 swing_low[i] = True
 
-                confirmation_index = (
-                    i + n
-                )
+                confirmation_index = i + n
 
                 if confirmation_index < length:
 
-                    confirmed_swing_low[
+                    swing_low_confirmed[
                         confirmation_index
                     ] = True
 
@@ -222,33 +158,25 @@ class MarketStructure:
                         confirmation_index
                     ] = current_low
 
-        # =====================================================
-        # SAVE COLUMNS
-        # =====================================================
+        df["swing_high"] = swing_high
 
-        df[
-            "swing_high"
-        ] = swing_high
+        df["swing_low"] = swing_low
 
-        df[
-            "swing_low"
-        ] = swing_low
+        df["swing_high_confirmed"] = (
+            swing_high_confirmed
+        )
 
-        df[
-            "confirmed_swing_high"
-        ] = confirmed_swing_high
+        df["swing_low_confirmed"] = (
+            swing_low_confirmed
+        )
 
-        df[
-            "confirmed_swing_low"
-        ] = confirmed_swing_low
+        df["swing_high_price"] = (
+            swing_high_price
+        )
 
-        df[
-            "swing_high_price"
-        ] = swing_high_price
-
-        df[
-            "swing_low_price"
-        ] = swing_low_price
+        df["swing_low_price"] = (
+            swing_low_price
+        )
 
         return df
 
@@ -268,125 +196,150 @@ class MarketStructure:
             dtype=object
         )
 
-        confirmed_highs = df[
-            "confirmed_swing_high"
-        ].to_numpy(
-            dtype=bool
+        swing_high_confirmed = (
+            df[
+                "swing_high_confirmed"
+            ]
+            .to_numpy(dtype=bool)
         )
 
-        confirmed_lows = df[
-            "confirmed_swing_low"
-        ].to_numpy(
-            dtype=bool
+        swing_low_confirmed = (
+            df[
+                "swing_low_confirmed"
+            ]
+            .to_numpy(dtype=bool)
         )
 
-        high_prices = df[
-            "swing_high_price"
-        ].to_numpy(
-            dtype=float
+        swing_high_price = (
+            df[
+                "swing_high_price"
+            ]
+            .to_numpy(dtype=float)
         )
 
-        low_prices = df[
-            "swing_low_price"
-        ].to_numpy(
-            dtype=float
+        swing_low_price = (
+            df[
+                "swing_low_price"
+            ]
+            .to_numpy(dtype=float)
         )
 
         previous_swing_high = None
+
         previous_swing_low = None
 
-        # =====================================================
-        # WALK FORWARD THROUGH TIME
-        # =====================================================
+        # -----------------------------------------------------
+        # Walk forward only.
+        #
+        # This prevents future-confirmed information from
+        # appearing before it was actually available.
+        # -----------------------------------------------------
 
         for i in range(length):
 
-            # -------------------------------------------------
-            # CONFIRMED HIGH
-            # -------------------------------------------------
+            # =================================================
+            # HIGH STRUCTURE
+            # =================================================
 
-            if confirmed_highs[i]:
+            if swing_high_confirmed[i]:
 
                 current_high = (
-                    high_prices[i]
+                    swing_high_price[i]
                 )
 
                 if (
-                    not np.isnan(current_high)
+                    previous_swing_high
+                    is not None
+                    and
+                    np.isfinite(current_high)
                 ):
 
                     if (
+                        current_high
+                        >
                         previous_swing_high
-                        is not None
                     ):
 
-                        if (
-                            current_high
-                            >
-                            previous_swing_high
-                        ):
+                        structure[i] = "HH"
 
-                            structure[i] = "HH"
+                    elif (
+                        current_high
+                        <
+                        previous_swing_high
+                    ):
 
-                        elif (
-                            current_high
-                            <
-                            previous_swing_high
-                        ):
+                        structure[i] = "LH"
 
-                            structure[i] = "LH"
+                if np.isfinite(current_high):
 
                     previous_swing_high = (
                         current_high
                     )
 
-            # -------------------------------------------------
-            # CONFIRMED LOW
-            # -------------------------------------------------
+            # =================================================
+            # LOW STRUCTURE
+            # =================================================
 
-            if confirmed_lows[i]:
+            if swing_low_confirmed[i]:
 
                 current_low = (
-                    low_prices[i]
+                    swing_low_price[i]
                 )
 
                 if (
-                    not np.isnan(current_low)
+                    previous_swing_low
+                    is not None
+                    and
+                    np.isfinite(current_low)
                 ):
 
                     if (
+                        current_low
+                        >
                         previous_swing_low
-                        is not None
                     ):
 
-                        if (
-                            current_low
-                            >
-                            previous_swing_low
-                        ):
+                        # If nothing has already been written
+                        # to this candle, store HL.
+                        #
+                        # If a high structure event happened
+                        # on the same candle, preserve the first
+                        # event rather than overwriting it.
 
+                        if structure[i] is None:
                             structure[i] = "HL"
 
-                        elif (
-                            current_low
-                            <
-                            previous_swing_low
-                        ):
+                    elif (
+                        current_low
+                        <
+                        previous_swing_low
+                    ):
 
+                        if structure[i] is None:
                             structure[i] = "LL"
+
+                if np.isfinite(current_low):
 
                     previous_swing_low = (
                         current_low
                     )
 
-        df[
-            "structure"
-        ] = structure
+        df["structure"] = structure
 
         return df
 
     # =========================================================
-    # DETERMINE ROLLING BIAS
+    # ROLLING BIAS
+    # =========================================================
+    #
+    # IMPORTANT:
+    #
+    # This bias is calculated progressively through the data.
+    # It does NOT look at the final structure and apply that
+    # answer backwards to earlier candles.
+    #
+    # At candle i, only structure confirmed at or before i
+    # can influence the bias.
     # =========================================================
 
     def determine_bias(self, df):
@@ -399,67 +352,45 @@ class MarketStructure:
             dtype=object
         )
 
-        structure = df[
-            "structure"
-        ].to_numpy(
-            dtype=object
+        structure = (
+            df["structure"]
+            .to_numpy(dtype=object)
         )
 
         latest_high_structure = None
-        latest_low_structure = None
 
-        # =====================================================
-        # WALK FORWARD
-        # =====================================================
-        #
-        # At candle i, only structure confirmed by candle i
-        # can affect the bias.
-        #
-        # Therefore this is causal.
-        # =====================================================
+        latest_low_structure = None
 
         for i in range(length):
 
             value = structure[i]
 
-            if value in [
+            if value in (
                 "HH",
                 "LH"
-            ]:
+            ):
 
                 latest_high_structure = value
 
-            elif value in [
+            elif value in (
                 "HL",
                 "LL"
-            ]:
+            ):
 
                 latest_low_structure = value
 
-            # -------------------------------------------------
-            # BULLISH
-            # -------------------------------------------------
-
             if (
-                latest_high_structure
-                == "HH"
+                latest_high_structure == "HH"
                 and
-                latest_low_structure
-                == "HL"
+                latest_low_structure == "HL"
             ):
 
                 biases[i] = "bullish"
 
-            # -------------------------------------------------
-            # BEARISH
-            # -------------------------------------------------
-
             elif (
-                latest_high_structure
-                == "LH"
+                latest_high_structure == "LH"
                 and
-                latest_low_structure
-                == "LL"
+                latest_low_structure == "LL"
             ):
 
                 biases[i] = "bearish"
@@ -478,69 +409,43 @@ class MarketStructure:
 
         df = df.copy()
 
-        # -----------------------------------------------------
-        # Validate
-        # -----------------------------------------------------
-
-        required = [
+        required_columns = [
             "high",
             "low"
         ]
 
         missing = [
             column
-            for column in required
+            for column in required_columns
             if column not in df.columns
         ]
 
         if missing:
 
             raise ValueError(
-                "Missing required market structure columns: "
-                + ", ".join(missing)
+                "Missing required market structure "
+                "columns: "
+                +
+                ", ".join(missing)
             )
 
-        # -----------------------------------------------------
-        # Detect swings
-        # -----------------------------------------------------
+        df = self.detect_swings(df)
 
-        df = self.detect_swings(
-            df
+        df = self.classify_structure(df)
+
+        biases = self.determine_bias(df)
+
+        df["structure_bias"] = biases
+
+        current_bias = (
+            biases[-1]
+            if length_safe(df) > 0
+            else "neutral"
         )
-
-        # -----------------------------------------------------
-        # Classify HH / HL / LH / LL
-        # -----------------------------------------------------
-
-        df = self.classify_structure(
-            df
-        )
-
-        # -----------------------------------------------------
-        # Rolling causal bias
-        # -----------------------------------------------------
-
-        biases = self.determine_bias(
-            df
-        )
-
-        df[
-            "structure_bias"
-        ] = biases
-
-        # -----------------------------------------------------
-        # Final diagnostic bias
-        #
-        # This is simply the last known bias and is useful for
-        # the runner's summary output.
-        # -----------------------------------------------------
-
-        if len(biases) > 0:
-
-            current_bias = biases[-1]
-
-        else:
-
-            current_bias = "neutral"
 
         return df, current_bias
+
+
+def length_safe(df):
+
+    return len(df)
