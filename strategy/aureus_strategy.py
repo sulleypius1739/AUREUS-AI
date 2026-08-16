@@ -1,148 +1,306 @@
-"""
-AUREUS AI
-Core Strategy Decision Engine
+from strategy.market_structure import MarketStructure
+from strategy.liquidity import LiquidityAnalyzer
+from strategy.zones import ZoneAnalyzer
+from strategy.confirmations import ConfirmationAnalyzer
+from strategy.risk_management import RiskManager
 
-The strategy follows:
-
-1. Higher timeframe bias
-2. Market structure
-3. Key support/resistance
-4. Supply/demand
-5. Order blocks
-6. Fair value gaps
-7. Liquidity
-8. Liquidity sweep
-9. Lower timeframe confirmation
-10. Candlestick confirmation
-11. Fundamental bias
-12. News/event risk
-13. Entry
-14. Stop loss
-15. Take profit
-"""
 
 class AureusStrategy:
 
-    def __init__(self):
-        self.minimum_score = 8
+    def __init__(
+        self,
+        minimum_score=3,
+        risk_percent=1.0,
+        minimum_rr=2.0
+    ):
 
-    def evaluate(self, setup):
+        self.minimum_score = minimum_score
 
-        score = 0
-        reasons = []
+        self.market_structure = MarketStructure()
 
-        # -----------------------------
-        # HIGHER TIMEFRAME
-        # -----------------------------
+        self.liquidity = LiquidityAnalyzer()
 
-        if setup.get("htf_bias") in ["bullish", "bearish"]:
-            score += 1
-            reasons.append("HTF bias identified")
+        self.zones = ZoneAnalyzer()
 
-        # -----------------------------
+        self.confirmations = ConfirmationAnalyzer()
+
+        self.risk = RiskManager(
+            risk_percent=risk_percent,
+            minimum_rr=minimum_rr
+        )
+
+    # =========================================================
+    # PREPARE MARKET
+    # =========================================================
+
+    def prepare(self, df):
+
+        df = df.copy()
+
+        # -------------------------
         # MARKET STRUCTURE
-        # -----------------------------
+        # -------------------------
 
-        if setup.get("market_structure") == setup.get("htf_bias"):
-            score += 1
-            reasons.append("Market structure aligns with HTF bias")
+        df, bias = self.market_structure.analyze(df)
 
-        # -----------------------------
-        # KEY LEVEL
-        # -----------------------------
-
-        if setup.get("key_level"):
-            score += 1
-            reasons.append("Price located at significant level")
-
-        # -----------------------------
-        # SUPPLY / DEMAND
-        # -----------------------------
-
-        if setup.get("supply_demand"):
-            score += 1
-            reasons.append("Supply/demand zone identified")
-
-        # -----------------------------
-        # ORDER BLOCK
-        # -----------------------------
-
-        if setup.get("order_block"):
-            score += 1
-            reasons.append("Order block identified")
-
-        # -----------------------------
-        # FVG
-        # -----------------------------
-
-        if setup.get("fvg"):
-            score += 1
-            reasons.append("Fair value gap identified")
-
-        # -----------------------------
+        # -------------------------
         # LIQUIDITY
-        # -----------------------------
+        # -------------------------
 
-        if setup.get("liquidity"):
-            score += 1
-            reasons.append("Liquidity pool identified")
+        df = self.liquidity.analyze(df)
 
-        # -----------------------------
-        # LIQUIDITY SWEEP
-        # -----------------------------
+        # -------------------------
+        # ZONES
+        # -------------------------
 
-        if setup.get("liquidity_sweep"):
-            score += 2
-            reasons.append("Liquidity sweep confirmed")
+        df = self.zones.analyze(df)
 
-        # -----------------------------
-        # LOWER TIMEFRAME
-        # -----------------------------
+        # -------------------------
+        # CANDLE CONFIRMATION
+        # -------------------------
 
-        if setup.get("ltf_confirmation"):
-            score += 1
-            reasons.append("Lower timeframe confirmation")
+        df = self.confirmations.analyze(df)
 
-        # -----------------------------
-        # CANDLESTICK
-        # -----------------------------
+        return df, bias
 
-        if setup.get("candle_confirmation"):
-            score += 1
-            reasons.append("Candlestick confirmation")
+    # =========================================================
+    # SCORE CURRENT CANDLE
+    # =========================================================
 
-        # -----------------------------
-        # FUNDAMENTALS
-        # -----------------------------
+    def score_candle(self, row):
 
-        if setup.get("fundamental_bias") == setup.get("htf_bias"):
-            score += 1
-            reasons.append("Fundamental bias aligned")
+        bullish_score = 0
+        bearish_score = 0
 
-        # -----------------------------
-        # NEWS
-        # -----------------------------
+        bullish_reasons = []
+        bearish_reasons = []
 
-        if setup.get("news_risk") == "low":
-            score += 1
-            reasons.append("News risk acceptable")
+        # =====================================================
+        # LIQUIDITY
+        # =====================================================
 
-        # -----------------------------
+        if row.get("sell_side_sweep", False):
+
+            bullish_score += 2
+
+            bullish_reasons.append(
+                "Sell-side liquidity sweep"
+            )
+
+        if row.get("buy_side_sweep", False):
+
+            bearish_score += 2
+
+            bearish_reasons.append(
+                "Buy-side liquidity sweep"
+            )
+
+        # =====================================================
+        # ORDER BLOCK
+        # =====================================================
+
+        if row.get(
+            "bullish_order_block",
+            False
+        ):
+
+            bullish_score += 1
+
+            bullish_reasons.append(
+                "Bullish order block"
+            )
+
+        if row.get(
+            "bearish_order_block",
+            False
+        ):
+
+            bearish_score += 1
+
+            bearish_reasons.append(
+                "Bearish order block"
+            )
+
+        # =====================================================
+        # FAIR VALUE GAP
+        # =====================================================
+
+        if row.get(
+            "bullish_fvg",
+            False
+        ):
+
+            bullish_score += 1
+
+            bullish_reasons.append(
+                "Bullish fair value gap"
+            )
+
+        if row.get(
+            "bearish_fvg",
+            False
+        ):
+
+            bearish_score += 1
+
+            bearish_reasons.append(
+                "Bearish fair value gap"
+            )
+
+        # =====================================================
+        # CANDLE CONFIRMATION
+        # =====================================================
+
+        if row.get(
+            "bullish_engulfing",
+            False
+        ):
+
+            bullish_score += 1
+
+            bullish_reasons.append(
+                "Bullish engulfing"
+            )
+
+        if row.get(
+            "bearish_engulfing",
+            False
+        ):
+
+            bearish_score += 1
+
+            bearish_reasons.append(
+                "Bearish engulfing"
+            )
+
+        if row.get(
+            "bullish_rejection",
+            False
+        ):
+
+            bullish_score += 1
+
+            bullish_reasons.append(
+                "Bullish rejection"
+            )
+
+        if row.get(
+            "bearish_rejection",
+            False
+        ):
+
+            bearish_score += 1
+
+            bearish_reasons.append(
+                "Bearish rejection"
+            )
+
+        # =====================================================
+        # DISPLACEMENT
+        # =====================================================
+
+        if row.get(
+            "displacement",
+            False
+        ):
+
+            close = row["close"]
+            open_price = row["open"]
+
+            if close > open_price:
+
+                bullish_score += 1
+
+                bullish_reasons.append(
+                    "Bullish displacement"
+                )
+
+            elif close < open_price:
+
+                bearish_score += 1
+
+                bearish_reasons.append(
+                    "Bearish displacement"
+                )
+
+        # =====================================================
         # FINAL DECISION
-        # -----------------------------
+        # =====================================================
 
-        if score >= self.minimum_score:
-
-            direction = setup.get("htf_bias")
+        if (
+            bullish_score >= self.minimum_score
+            and
+            bullish_score > bearish_score
+        ):
 
             return {
-                "signal": direction,
-                "score": score,
-                "reasons": reasons
+                "signal": "BUY",
+                "score": bullish_score,
+                "reasons": bullish_reasons
+            }
+
+        if (
+            bearish_score >= self.minimum_score
+            and
+            bearish_score > bullish_score
+        ):
+
+            return {
+                "signal": "SELL",
+                "score": bearish_score,
+                "reasons": bearish_reasons
             }
 
         return {
             "signal": "WAIT",
-            "score": score,
-            "reasons": reasons
+            "score": max(
+                bullish_score,
+                bearish_score
+            ),
+            "reasons": (
+                bullish_reasons
+                +
+                bearish_reasons
+            )
         }
+
+    # =========================================================
+    # GENERATE SIGNAL
+    # =========================================================
+
+    def generate_signal(
+        self,
+        df,
+        index
+    ):
+
+        row = df.iloc[index]
+
+        result = self.score_candle(row)
+
+        return result
+
+    # =========================================================
+    # COMPLETE ANALYSIS
+    # =========================================================
+
+    def analyze(self, df):
+
+        df, bias = self.prepare(df)
+
+        signals = []
+
+        for i in range(len(df)):
+
+            signal = self.generate_signal(
+                df,
+                i
+            )
+
+            signals.append(
+                signal["signal"]
+            )
+
+        df["aureus_signal"] = signals
+
+        return df, bias
