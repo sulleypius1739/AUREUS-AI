@@ -1,617 +1,322 @@
-/*
-============================================================
-AUREUS AI — APPLICATION CONTROLLER
-============================================================
-*/
+/* =========================================================
+   AUREUS AI — APPLICATION CONTROLLER
+   ========================================================= */
 
-const AureusApp = {
+document.addEventListener("DOMContentLoaded", () => {
 
-    state: {
+    console.log("AUREUS AI initialized.");
 
-        selectedMarket:
-            "XAU/USD",
+    /* -----------------------------------------------------
+       CLOCK
+    ----------------------------------------------------- */
 
-        selectedTimeframe:
-            "1H",
+    function updateClock() {
 
-        marketBias:
-            "NEUTRAL",
+        const clock =
+            document.getElementById("marketClock");
 
-        signal:
-            "WAIT",
+        if (!clock) return;
 
-        score:
-            0,
+        const now = new Date();
 
-        connected:
-            false
+        clock.textContent =
+            now.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+            });
+    }
 
-    },
+    updateClock();
 
+    setInterval(updateClock, 1000);
 
-    markets: [
 
-        {
-            symbol:
-                "XAU/USD",
+    /* -----------------------------------------------------
+       MOBILE SIDEBAR
+    ----------------------------------------------------- */
 
-            name:
-                "Gold",
+    const menuButton =
+        document.getElementById("menuButton");
 
-            category:
-                "METALS",
+    const sidebar =
+        document.getElementById("sidebar");
 
-            currency:
-                "USD"
+    if (menuButton && sidebar) {
 
-        },
+        menuButton.addEventListener(
+            "click",
+            () => {
 
-        {
-            symbol:
-                "EUR/USD",
-
-            name:
-                "Euro / Dollar",
-
-            category:
-                "FOREX",
-
-            currency:
-                "EUR"
-
-        },
-
-        {
-            symbol:
-                "GBP/USD",
-
-            name:
-                "Pound / Dollar",
-
-            category:
-                "FOREX",
-
-            currency:
-                "GBP"
-
-        },
-
-        {
-            symbol:
-                "USD/JPY",
-
-            name:
-                "Dollar / Yen",
-
-            category:
-                "FOREX",
-
-            currency:
-                "JPY"
-
-        },
-
-        {
-            symbol:
-                "USD/CAD",
-
-            name:
-                "Dollar / Canadian",
-
-            category:
-                "FOREX",
-
-            currency:
-                "CAD"
-
-        },
-
-        {
-            symbol:
-                "AUD/USD",
-
-            name:
-                "Australian Dollar",
-
-            category:
-                "FOREX",
-
-            currency:
-                "AUD"
-
-        },
-
-        {
-            symbol:
-                "NAS100",
-
-            name:
-                "Nasdaq 100",
-
-            category:
-                "INDEX",
-
-            currency:
-                "USD"
-
-        },
-
-        {
-            symbol:
-                "US30",
-
-            name:
-                "Dow Jones",
-
-            category:
-                "INDEX",
-
-            currency:
-                "USD"
-
-        },
-
-        {
-            symbol:
-                "SPX500",
-
-            name:
-                "S&P 500",
-
-            category:
-                "INDEX",
-
-            currency:
-                "USD"
-
-        },
-
-        {
-            symbol:
-                "BTC/USD",
-
-            name:
-                "Bitcoin",
-
-            category:
-                "CRYPTO",
-
-            currency:
-                "USD"
-
-        }
-
-    ],
-
-
-    init() {
-
-        console.log(
-            "AUREUS AI INITIALIZED"
-        );
-
-        this.setupNavigation();
-
-        this.setupMarketCards();
-
-        this.setupTimeframes();
-
-        this.setupButtons();
-
-        this.updateDashboard();
-
-    },
-
-
-    setupNavigation() {
-
-        const navItems =
-            document.querySelectorAll(
-                "[data-page]"
-            );
-
-
-        navItems.forEach(
-            item => {
-
-                item.addEventListener(
-                    "click",
-                    event => {
-
-                        event.preventDefault();
-
-                        const page =
-                            item.dataset.page;
-
-                        this.showPage(
-                            page
-                        );
-
-                    }
+                sidebar.classList.toggle(
+                    "sidebar-open"
                 );
 
             }
         );
 
-    },
+    }
 
 
-    showPage(page) {
+    /* -----------------------------------------------------
+       NAVIGATION
+    ----------------------------------------------------- */
 
-        document
-            .querySelectorAll(
-                ".aureus-page"
-            )
-            .forEach(
-                section => {
+    const navigationButtons =
+        document.querySelectorAll(
+            "[data-section]"
+        );
 
-                    section.style.display =
-                        "none";
+    const sections =
+        document.querySelectorAll(
+            ".app-section"
+        );
 
-                }
-            );
+    navigationButtons.forEach(button => {
+
+        button.addEventListener(
+            "click",
+            () => {
+
+                const target =
+                    button.dataset.section;
+
+                navigationButtons.forEach(
+                    item =>
+                        item.classList.remove(
+                            "active"
+                        )
+                );
+
+                button.classList.add(
+                    "active"
+                );
 
 
-        const target =
-            document.getElementById(
-                page
-            );
+                sections.forEach(section => {
+
+                    section.classList.remove(
+                        "active-section"
+                    );
+
+                });
 
 
-        if (target) {
+                const selected =
+                    document.getElementById(
+                        target
+                    );
 
-            target.style.display =
-                "block";
+                if (selected) {
 
-        }
-
-
-        document
-            .querySelectorAll(
-                "[data-page]"
-            )
-            .forEach(
-                item => {
-
-                    item.classList.remove(
-                        "active"
+                    selected.classList.add(
+                        "active-section"
                     );
 
                 }
-            );
 
 
-        const active =
-            document.querySelector(
-                `[data-page="${page}"]`
-            );
+                if (window.innerWidth < 900) {
 
-
-        if (active) {
-
-            active.classList.add(
-                "active"
-            );
-
-        }
-
-    },
-
-
-    setupMarketCards() {
-
-        document
-            .querySelectorAll(
-                "[data-symbol]"
-            )
-            .forEach(
-                card => {
-
-                    card.addEventListener(
-                        "click",
-                        () => {
-
-                            this.selectMarket(
-                                card.dataset.symbol
-                            );
-
-                        }
+                    sidebar?.classList.remove(
+                        "sidebar-open"
                     );
 
                 }
-            );
 
-    },
-
-
-    selectMarket(
-        symbol
-    ) {
-
-        this.state.selectedMarket =
-            symbol;
-
-
-        const market =
-            this.markets.find(
-                item =>
-                    item.symbol ===
-                    symbol
-            );
-
-
-        if (!market) return;
-
-
-        const title =
-            document.getElementById(
-                "selectedMarket"
-            );
-
-
-        if (title) {
-
-            title.textContent =
-                market.symbol;
-
-        }
-
-
-        this.updateDashboard();
-
-
-        this.showPage(
-            "analysis"
+            }
         );
 
-    },
+    });
 
 
-    setupTimeframes() {
+    /* -----------------------------------------------------
+       MARKET SEARCH
+    ----------------------------------------------------- */
 
-        document
-            .querySelectorAll(
-                "[data-timeframe]"
-            )
-            .forEach(
-                button => {
+    const searchInput =
+        document.getElementById(
+            "marketSearch"
+        );
 
-                    button.addEventListener(
-                        "click",
-                        () => {
-
-                            this.state
-                                .selectedTimeframe =
-                                button
-                                .dataset
-                                .timeframe;
-
-                            this.updateDashboard();
-
-                        }
-                    );
-
-                }
-            );
-
-    },
-
-
-    setupButtons() {
-
-        const scanButton =
-            document.getElementById(
-                "scanMarkets"
-            );
-
-
-        if (scanButton) {
-
-            scanButton.addEventListener(
-                "click",
-                () => {
-
-                    this.scanMarkets();
-
-                }
-            );
-
-        }
-
-
-        const refreshButton =
-            document.getElementById(
-                "refreshData"
-            );
-
-
-        if (refreshButton) {
-
-            refreshButton.addEventListener(
-                "click",
-                () => {
-
-                    this.refresh();
-
-                }
-            );
-
-        }
-
-    },
-
-
-    scanMarkets() {
-
-        console.log(
-            "Aureus scanning all markets..."
+    const marketCards =
+        document.querySelectorAll(
+            ".market-card"
         );
 
 
-        const results =
-            this.markets.map(
-                market => ({
+    if (searchInput) {
 
-                    symbol:
-                        market.symbol,
+        searchInput.addEventListener(
+            "input",
+            () => {
 
-                    score:
-                        Math.floor(
-                            Math.random() *
-                            101
-                        ),
-
-                    bias:
-                        Math.random() >
-                        0.5
-                            ? "BULLISH"
-                            : "BEARISH"
-
-                })
-            );
+                const query =
+                    searchInput.value
+                        .toLowerCase()
+                        .trim();
 
 
-        results.sort(
-            (a, b) =>
-                b.score -
-                a.score
+                marketCards.forEach(card => {
+
+                    const text =
+                        card.textContent
+                            .toLowerCase();
+
+
+                    card.style.display =
+                        text.includes(query)
+                            ? ""
+                            : "none";
+
+                });
+
+            }
         );
 
-
-        console.table(
-            results
-        );
+    }
 
 
-        this.renderScanResults(
-            results
-        );
+    /* -----------------------------------------------------
+       MARKET CARDS
+    ----------------------------------------------------- */
 
-    },
+    marketCards.forEach(card => {
 
+        card.addEventListener(
+            "click",
+            () => {
 
-    renderScanResults(
-        results
-    ) {
-
-        const container =
-            document.getElementById(
-                "scanResults"
-            );
-
-
-        if (!container) return;
+                const symbol =
+                    card.dataset.symbol ||
+                    card.querySelector(
+                        ".market-symbol"
+                    )?.textContent ||
+                    "UNKNOWN";
 
 
-        container.innerHTML =
-            "";
-
-
-        results.forEach(
-            result => {
-
-                const row =
-                    document.createElement(
-                        "div"
+                const selected =
+                    document.getElementById(
+                        "selectedMarket"
                     );
 
 
-                row.className =
-                    "scan-row";
+                if (selected) {
+
+                    selected.textContent =
+                        symbol;
+
+                }
 
 
-                row.innerHTML = `
+                const scanner =
+                    document.getElementById(
+                        "scanner"
+                    );
 
-                    <span>
-                        ${result.symbol}
-                    </span>
 
-                    <span>
-                        ${result.bias}
-                    </span>
+                if (scanner) {
 
-                    <strong>
-                        ${result.score}/100
-                    </strong>
+                    scanner.scrollIntoView({
+                        behavior: "smooth"
+                    });
 
+                }
+
+            }
+        );
+
+    });
+
+
+    /* -----------------------------------------------------
+       DEMO ANALYSIS
+    ----------------------------------------------------- */
+
+    const analyzeButton =
+        document.getElementById(
+            "analyzeButton"
+        );
+
+
+    if (analyzeButton) {
+
+        analyzeButton.addEventListener(
+            "click",
+            () => {
+
+                const result =
+                    document.getElementById(
+                        "analysisResult"
+                    );
+
+
+                if (!result) return;
+
+
+                result.innerHTML = `
+                    <div class="analysis-placeholder">
+                        <div class="analysis-icon">◈</div>
+
+                        <h3>
+                            AUREUS ANALYSIS ENGINE
+                        </h3>
+
+                        <p>
+                            Market analysis interface
+                            is ready.
+                        </p>
+
+                        <div class="analysis-tags">
+                            <span>STRUCTURE</span>
+                            <span>LIQUIDITY</span>
+                            <span>ORDER BLOCK</span>
+                            <span>FVG</span>
+                            <span>SUPPLY / DEMAND</span>
+                            <span>RISK</span>
+                            <span>FUNDAMENTALS</span>
+                        </div>
+                    </div>
                 `;
 
+            }
+        );
 
-                row.onclick =
-                    () => {
-
-                        this.selectMarket(
-                            result.symbol
-                        );
-
-                    };
+    }
 
 
-                container.appendChild(
-                    row
-                );
+    /* -----------------------------------------------------
+       BACKTEST DEMO BUTTON
+    ----------------------------------------------------- */
+
+    const backtestButton =
+        document.getElementById(
+            "runBacktest"
+        );
+
+
+    if (backtestButton) {
+
+        backtestButton.addEventListener(
+            "click",
+            () => {
+
+                const status =
+                    document.getElementById(
+                        "backtestStatus"
+                    );
+
+
+                if (status) {
+
+                    status.textContent =
+                        "Backtest engine ready — historical data provider required.";
+
+                }
 
             }
         );
 
-    },
-
-
-    updateDashboard() {
-
-        const market =
-            this.state.selectedMarket;
-
-
-        const selected =
-            document.getElementById(
-                "selectedMarket"
-            );
-
-
-        if (selected) {
-
-            selected.textContent =
-                market;
-
-        }
-
-
-        const timeframe =
-            document.getElementById(
-                "selectedTimeframe"
-            );
-
-
-        if (timeframe) {
-
-            timeframe.textContent =
-                this.state
-                    .selectedTimeframe;
-
-        }
-
-    },
-
-
-    refresh() {
-
-        console.log(
-            "Refreshing Aureus..."
-        );
-
-        this.updateDashboard();
-
     }
 
-};
-
-
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-
-        AureusApp.init();
-
-    }
-);
+});
