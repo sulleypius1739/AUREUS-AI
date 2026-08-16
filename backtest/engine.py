@@ -33,19 +33,6 @@ class BacktestEngine:
 
         self.trades = []
 
-        # Diagnostic counters — why did a signal NOT become a trade?
-        self.diagnostics = {
-            "signals_seen": 0,
-            "rejected_no_stop": 0,
-            "rejected_invalid_trade": 0,
-            "opened": 0,
-            "sample_rejections": []
-        }
-
-    # =========================================================
-    # PREPARE DATA
-    # =========================================================
-
     def prepare_data(self, df):
 
         df = df.copy()
@@ -79,68 +66,36 @@ class BacktestEngine:
 
         return df, bias
 
-    # =========================================================
-    # EXECUTE TRADE
-    # =========================================================
-    #
-    # ENTRY TIMING FIX
-    # ----------------
-    # The signal is generated using information available at
-    # the CLOSE of `signal_index`. To avoid unrealistic
-    # same-candle decide-and-execute behaviour, the trade is
-    # filled at the OPEN of `entry_index` (signal_index + 1),
-    # not at signal_index's own close.
-    #
-    # The structural stop is calculated using data known as of
-    # `signal_index`'s close — never data from `entry_index`,
-    # since that candle hasn't happened yet at decision time.
-    # =========================================================
-
     def open_trade(
         self,
         df,
-        signal_index,
-        entry_index,
+        index,
         signal
     ):
 
         entry = float(
-            df.iloc[entry_index]["open"]
+            df.iloc[index]["close"]
         )
 
         direction = signal["signal"]
 
         if direction == "BUY":
 
+            stop = float(
+                df.iloc[index]["low"]
+            )
+
             trade_direction = "bullish"
 
         elif direction == "SELL":
 
+            stop = float(
+                df.iloc[index]["high"]
+            )
+
             trade_direction = "bearish"
 
         else:
-
-            return None
-
-        self.diagnostics["signals_seen"] += 1
-
-        stop = self.risk.find_structural_stop(
-            df,
-            signal_index,
-            trade_direction
-        )
-
-        if stop is None:
-
-            self.diagnostics["rejected_no_stop"] += 1
-
-            if len(self.diagnostics["sample_rejections"]) < 5:
-                self.diagnostics["sample_rejections"].append({
-                    "reason": "no_stop",
-                    "signal_index": signal_index,
-                    "direction": trade_direction,
-                    "entry": entry
-                })
 
             return None
 
@@ -159,21 +114,7 @@ class BacktestEngine:
 
         if not valid:
 
-            self.diagnostics["rejected_invalid_trade"] += 1
-
-            if len(self.diagnostics["sample_rejections"]) < 5:
-                self.diagnostics["sample_rejections"].append({
-                    "reason": "invalid_trade",
-                    "signal_index": signal_index,
-                    "direction": trade_direction,
-                    "entry": entry,
-                    "stop": stop,
-                    "target": target
-                })
-
             return None
-
-        self.diagnostics["opened"] += 1
 
         position_size = (
             self.risk.calculate_position_size(
@@ -185,9 +126,7 @@ class BacktestEngine:
 
         trade = {
 
-            "signal_index": signal_index,
-
-            "entry_index": entry_index,
+            "entry_index": index,
 
             "direction": direction,
 
@@ -215,10 +154,6 @@ class BacktestEngine:
 
         return trade
 
-    # =========================================================
-    # CHECK OPEN TRADES
-    # =========================================================
-
     def check_open_trades(
         self,
         df,
@@ -230,12 +165,6 @@ class BacktestEngine:
         for trade in self.trades:
 
             if trade["result"] != "OPEN":
-
-                continue
-
-            # A trade can't be checked against a candle before
-            # it was actually filled.
-            if current_index < trade["entry_index"]:
 
                 continue
 
@@ -299,10 +228,6 @@ class BacktestEngine:
 
                     trade["exit_index"] = current_index
 
-    # =========================================================
-    # RUN BACKTEST
-    # =========================================================
-
     def run(self, df):
 
         df, bias = self.prepare_data(df)
@@ -320,9 +245,7 @@ class BacktestEngine:
 
         print()
 
-        length = len(df)
-
-        for i in range(length):
+        for i in range(len(df)):
 
             self.check_open_trades(
                 df,
@@ -338,10 +261,6 @@ class BacktestEngine:
 
                 continue
 
-            if i + 1 >= length:
-
-                continue
-
             signal = self.strategy.generate_signal(
                 df,
                 i
@@ -354,7 +273,6 @@ class BacktestEngine:
             self.open_trade(
                 df,
                 i,
-                i + 1,
                 signal
             )
 
@@ -364,18 +282,6 @@ class BacktestEngine:
 
                 trade["result"] = "OPEN_AT_END"
 
-                trade["exit_index"] = length - 1
-
-        print()
-        print("=" * 55)
-        print("DIAGNOSTICS")
-        print("=" * 55)
-        print("Signals seen:          ", self.diagnostics["signals_seen"])
-        print("Rejected (no stop):    ", self.diagnostics["rejected_no_stop"])
-        print("Rejected (invalid RR): ", self.diagnostics["rejected_invalid_trade"])
-        print("Opened:                ", self.diagnostics["opened"])
-        print()
-        for sample in self.diagnostics["sample_rejections"]:
-            print(sample)
+                trade["exit_index"] = len(df) - 1
 
         return self.trades, df, bias
