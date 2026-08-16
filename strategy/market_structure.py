@@ -1,202 +1,245 @@
 import pandas as pd
+import numpy as np
 
 
 class MarketStructure:
 
     def __init__(self, swing_length=3):
+
         self.swing_length = swing_length
 
     # =========================================================
-    # DETECT SWING HIGHS AND SWING LOWS
+    # DETECT SWING HIGHS / LOWS
     # =========================================================
 
     def detect_swings(self, df):
 
         df = df.copy()
 
-        # Create columns
-        df["swing_high"] = False
-        df["swing_low"] = False
-
         n = self.swing_length
 
-        # We need candles on both sides of the current candle
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
+
+        swing_high = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        swing_low = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        # -----------------------------------------------------
+        # A swing high must be higher than the n candles
+        # before and after it.
+        # -----------------------------------------------------
+
         for i in range(n, len(df) - n):
 
-            current_high = df.iloc[i]["high"]
-            current_low = df.iloc[i]["low"]
+            current_high = highs[i]
 
-            left_highs = df.iloc[i-n:i]["high"]
-            right_highs = df.iloc[i+1:i+n+1]["high"]
+            left_high = highs[
+                i - n:i
+            ]
 
-            left_lows = df.iloc[i-n:i]["low"]
-            right_lows = df.iloc[i+1:i+n+1]["low"]
-
-            # -------------------------------------------------
-            # SWING HIGH
-            # -------------------------------------------------
-            #
-            # Current high must be greater than every high
-            # in the selected candles to the left and right.
-            # -------------------------------------------------
+            right_high = highs[
+                i + 1:i + n + 1
+            ]
 
             if (
-                current_high > left_highs.max()
+                current_high > left_high.max()
                 and
-                current_high > right_highs.max()
+                current_high > right_high.max()
             ):
 
-                df.loc[
-                    df.index[i],
-                    "swing_high"
-                ] = True
+                swing_high[i] = True
 
             # -------------------------------------------------
-            # SWING LOW
+            # Swing low
             # -------------------------------------------------
-            #
-            # Current low must be lower than every low
-            # in the selected candles to the left and right.
-            # -------------------------------------------------
+
+            current_low = lows[i]
+
+            left_low = lows[
+                i - n:i
+            ]
+
+            right_low = lows[
+                i + 1:i + n + 1
+            ]
 
             if (
-                current_low < left_lows.min()
+                current_low < left_low.min()
                 and
-                current_low < right_lows.min()
+                current_low < right_low.min()
             ):
 
-                df.loc[
-                    df.index[i],
-                    "swing_low"
-                ] = True
+                swing_low[i] = True
+
+        df["swing_high"] = swing_high
+
+        df["swing_low"] = swing_low
 
         return df
 
     # =========================================================
-    # CLASSIFY MARKET STRUCTURE
+    # CLASSIFY SWING STRUCTURE
     # =========================================================
 
     def classify_structure(self, df):
 
         df = df.copy()
 
-        df["structure"] = None
+        structure = np.full(
+            len(df),
+            None,
+            dtype=object
+        )
 
-        previous_high = None
-        previous_low = None
+        highs = df["high"].to_numpy()
+
+        lows = df["low"].to_numpy()
+
+        swing_highs = df[
+            "swing_high"
+        ].to_numpy()
+
+        swing_lows = df[
+            "swing_low"
+        ].to_numpy()
+
+        previous_swing_high = None
+
+        previous_swing_low = None
 
         # -----------------------------------------------------
-        # PROCESS EACH CANDLE
+        # We iterate over numpy arrays rather than doing
+        # df.iloc[i] on every candle.
+        # This is dramatically faster.
         # -----------------------------------------------------
 
         for i in range(len(df)):
 
-            row = df.iloc[i]
-
-            # =================================================
+            # ================================================
             # SWING HIGH
-            # =================================================
+            # ================================================
 
-            if row["swing_high"]:
+            if swing_highs[i]:
 
-                current_high = row["high"]
+                current_high = highs[i]
 
-                # We can only classify the high if we have
-                # another previous swing high to compare it to.
+                if (
+                    previous_swing_high
+                    is not None
+                ):
 
-                if previous_high is not None:
+                    if (
+                        current_high
+                        >
+                        previous_swing_high
+                    ):
 
-                    if current_high > previous_high:
+                        structure[i] = "HH"
 
-                        df.loc[
-                            df.index[i],
-                            "structure"
-                        ] = "HH"
+                    elif (
+                        current_high
+                        <
+                        previous_swing_high
+                    ):
 
-                    elif current_high < previous_high:
+                        structure[i] = "LH"
 
-                        df.loc[
-                            df.index[i],
-                            "structure"
-                        ] = "LH"
+                previous_swing_high = current_high
 
-                previous_high = current_high
-
-            # =================================================
+            # ================================================
             # SWING LOW
-            # =================================================
+            # ================================================
 
-            if row["swing_low"]:
+            if swing_lows[i]:
 
-                current_low = row["low"]
+                current_low = lows[i]
 
-                # Compare current swing low with previous
-                # swing low.
+                if (
+                    previous_swing_low
+                    is not None
+                ):
 
-                if previous_low is not None:
+                    if (
+                        current_low
+                        >
+                        previous_swing_low
+                    ):
 
-                    if current_low > previous_low:
+                        structure[i] = "HL"
 
-                        df.loc[
-                            df.index[i],
-                            "structure"
-                        ] = "HL"
+                    elif (
+                        current_low
+                        <
+                        previous_swing_low
+                    ):
 
-                    elif current_low < previous_low:
+                        structure[i] = "LL"
 
-                        df.loc[
-                            df.index[i],
-                            "structure"
-                        ] = "LL"
+                previous_swing_low = current_low
 
-                previous_low = current_low
+        df["structure"] = structure
 
         return df
 
     # =========================================================
-    # DETERMINE MARKET BIAS
+    # DETERMINE BIAS
     # =========================================================
 
     def determine_bias(self, df):
 
-        # Get classified swing highs
-        highs = df[
-            df["structure"].isin(
-                ["HH", "LH"]
-            )
-        ]
+        structure = df[
+            "structure"
+        ].dropna()
 
-        # Get classified swing lows
-        lows = df[
-            df["structure"].isin(
-                ["HL", "LL"]
-            )
-        ]
-
-        # Not enough information
-        if (
-            len(highs) == 0
-            or
-            len(lows) == 0
-        ):
+        if len(structure) < 2:
 
             return "neutral"
 
-        # Most recent classified high
-        recent_high = highs.iloc[-1]["structure"]
+        # -----------------------------------------------------
+        # Find the most recent classified high
+        # -----------------------------------------------------
 
-        # Most recent classified low
-        recent_low = lows.iloc[-1]["structure"]
+        recent_high = None
+
+        recent_low = None
+
+        for value in reversed(
+            structure.to_numpy()
+        ):
+
+            if (
+                recent_high is None
+                and
+                value in ["HH", "LH"]
+            ):
+
+                recent_high = value
+
+            if (
+                recent_low is None
+                and
+                value in ["HL", "LL"]
+            ):
+
+                recent_low = value
+
+            if (
+                recent_high is not None
+                and
+                recent_low is not None
+            ):
+
+                break
 
         # -----------------------------------------------------
-        # BULLISH STRUCTURE
-        # -----------------------------------------------------
-        #
-        # Higher High + Higher Low
-        #
-        # HH
-        # HL
-        #
+        # Bullish
         # -----------------------------------------------------
 
         if (
@@ -208,14 +251,7 @@ class MarketStructure:
             return "bullish"
 
         # -----------------------------------------------------
-        # BEARISH STRUCTURE
-        # -----------------------------------------------------
-        #
-        # Lower High + Lower Low
-        #
-        # LH
-        # LL
-        #
+        # Bearish
         # -----------------------------------------------------
 
         if (
@@ -226,35 +262,17 @@ class MarketStructure:
 
             return "bearish"
 
-        # -----------------------------------------------------
-        # MIXED STRUCTURE
-        # -----------------------------------------------------
-
         return "neutral"
 
     # =========================================================
-    # COMPLETE MARKET STRUCTURE ANALYSIS
+    # COMPLETE ANALYSIS
     # =========================================================
 
     def analyze(self, df):
 
-        # Step 1:
-        # Find objective swing highs and lows.
-
         df = self.detect_swings(df)
 
-        # Step 2:
-        # Classify swings as:
-        #
-        # HH = Higher High
-        # HL = Higher Low
-        # LH = Lower High
-        # LL = Lower Low
-
         df = self.classify_structure(df)
-
-        # Step 3:
-        # Determine overall structural bias.
 
         bias = self.determine_bias(df)
 
