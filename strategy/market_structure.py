@@ -5,13 +5,18 @@ import numpy as np
 class MarketStructure:
 
     def __init__(self, swing_length=3):
-        if swing_length < 1:
-            raise ValueError("swing_length must be >= 1")
 
-        self.swing_length = int(swing_length)
+        if swing_length < 1:
+            raise ValueError(
+                "swing_length must be >= 1"
+            )
+
+        self.swing_length = int(
+            swing_length
+        )
 
     # =========================================================
-    # DETECT SWING HIGHS / LOWS
+    # DETECT SWINGS
     # =========================================================
 
     def detect_swings(self, df):
@@ -21,15 +26,17 @@ class MarketStructure:
         n = self.swing_length
         length = len(df)
 
-        highs = pd.to_numeric(
-            df["high"],
-            errors="coerce"
-        ).to_numpy(dtype=float)
+        highs = df["high"].to_numpy(
+            dtype=float
+        )
 
-        lows = pd.to_numeric(
-            df["low"],
-            errors="coerce"
-        ).to_numpy(dtype=float)
+        lows = df["low"].to_numpy(
+            dtype=float
+        )
+
+        # -----------------------------------------------------
+        # Swing information
+        # -----------------------------------------------------
 
         swing_high = np.zeros(
             length,
@@ -40,6 +47,13 @@ class MarketStructure:
             length,
             dtype=bool
         )
+
+        # -----------------------------------------------------
+        # Confirmation information
+        #
+        # These are the columns that downstream strategy
+        # logic should use.
+        # -----------------------------------------------------
 
         swing_high_confirmed = np.zeros(
             length,
@@ -61,22 +75,18 @@ class MarketStructure:
             np.nan
         )
 
-        # -----------------------------------------------------
-        # A swing at candle i is only known at i + n.
-        #
-        # Example with swing_length = 3:
-        #
-        # actual swing:       candle 100
-        # confirmation:       candle 103
-        #
-        # Therefore all trading logic must use the confirmed
-        # columns, NOT swing_high/swing_low at the anchor.
-        # -----------------------------------------------------
+        # =====================================================
+        # FIND SWINGS
+        # =====================================================
 
         for i in range(
             n,
             length - n
         ):
+
+            # -------------------------------------------------
+            # HIGH
+            # -------------------------------------------------
 
             current_high = highs[i]
 
@@ -88,20 +98,10 @@ class MarketStructure:
                 i + 1:i + n + 1
             ]
 
-            # -------------------------------------------------
-            # SWING HIGH
-            # -------------------------------------------------
-
             if (
-                np.isfinite(current_high)
+                current_high > left_highs.max()
                 and
-                len(left_highs) == n
-                and
-                len(right_highs) == n
-                and
-                current_high > np.max(left_highs)
-                and
-                current_high > np.max(right_highs)
+                current_high > right_highs.max()
             ):
 
                 swing_high[i] = True
@@ -119,7 +119,7 @@ class MarketStructure:
                     ] = current_high
 
             # -------------------------------------------------
-            # SWING LOW
+            # LOW
             # -------------------------------------------------
 
             current_low = lows[i]
@@ -133,15 +133,9 @@ class MarketStructure:
             ]
 
             if (
-                np.isfinite(current_low)
+                current_low < left_lows.min()
                 and
-                len(left_lows) == n
-                and
-                len(right_lows) == n
-                and
-                current_low < np.min(left_lows)
-                and
-                current_low < np.min(right_lows)
+                current_low < right_lows.min()
             ):
 
                 swing_low[i] = True
@@ -157,6 +151,10 @@ class MarketStructure:
                     swing_low_price[
                         confirmation_index
                     ] = current_low
+
+        # =====================================================
+        # SAVE RESULTS
+        # =====================================================
 
         df["swing_high"] = swing_high
 
@@ -196,62 +194,58 @@ class MarketStructure:
             dtype=object
         )
 
-        swing_high_confirmed = (
+        confirmed_highs = (
             df[
                 "swing_high_confirmed"
-            ]
-            .to_numpy(dtype=bool)
+            ].to_numpy(
+                dtype=bool
+            )
         )
 
-        swing_low_confirmed = (
+        confirmed_lows = (
             df[
                 "swing_low_confirmed"
-            ]
-            .to_numpy(dtype=bool)
+            ].to_numpy(
+                dtype=bool
+            )
         )
 
-        swing_high_price = (
+        high_prices = (
             df[
                 "swing_high_price"
-            ]
-            .to_numpy(dtype=float)
+            ].to_numpy(
+                dtype=float
+            )
         )
 
-        swing_low_price = (
+        low_prices = (
             df[
                 "swing_low_price"
-            ]
-            .to_numpy(dtype=float)
+            ].to_numpy(
+                dtype=float
+            )
         )
 
         previous_swing_high = None
-
         previous_swing_low = None
 
-        # -----------------------------------------------------
-        # Walk forward only.
-        #
-        # This prevents future-confirmed information from
-        # appearing before it was actually available.
-        # -----------------------------------------------------
+        # =====================================================
+        # WALK FORWARD
+        # =====================================================
 
         for i in range(length):
 
-            # =================================================
-            # HIGH STRUCTURE
-            # =================================================
+            # -------------------------------------------------
+            # CONFIRMED HIGH
+            # -------------------------------------------------
 
-            if swing_high_confirmed[i]:
+            if confirmed_highs[i]:
 
-                current_high = (
-                    swing_high_price[i]
-                )
+                current_high = high_prices[i]
 
                 if (
                     previous_swing_high
                     is not None
-                    and
-                    np.isfinite(current_high)
                 ):
 
                     if (
@@ -270,27 +264,21 @@ class MarketStructure:
 
                         structure[i] = "LH"
 
-                if np.isfinite(current_high):
-
-                    previous_swing_high = (
-                        current_high
-                    )
-
-            # =================================================
-            # LOW STRUCTURE
-            # =================================================
-
-            if swing_low_confirmed[i]:
-
-                current_low = (
-                    swing_low_price[i]
+                previous_swing_high = (
+                    current_high
                 )
+
+            # -------------------------------------------------
+            # CONFIRMED LOW
+            # -------------------------------------------------
+
+            if confirmed_lows[i]:
+
+                current_low = low_prices[i]
 
                 if (
                     previous_swing_low
                     is not None
-                    and
-                    np.isfinite(current_low)
                 ):
 
                     if (
@@ -299,15 +287,7 @@ class MarketStructure:
                         previous_swing_low
                     ):
 
-                        # If nothing has already been written
-                        # to this candle, store HL.
-                        #
-                        # If a high structure event happened
-                        # on the same candle, preserve the first
-                        # event rather than overwriting it.
-
-                        if structure[i] is None:
-                            structure[i] = "HL"
+                        structure[i] = "HL"
 
                     elif (
                         current_low
@@ -315,91 +295,96 @@ class MarketStructure:
                         previous_swing_low
                     ):
 
-                        if structure[i] is None:
-                            structure[i] = "LL"
+                        structure[i] = "LL"
 
-                if np.isfinite(current_low):
-
-                    previous_swing_low = (
-                        current_low
-                    )
+                previous_swing_low = (
+                    current_low
+                )
 
         df["structure"] = structure
 
         return df
 
     # =========================================================
-    # ROLLING BIAS
-    # =========================================================
-    #
-    # IMPORTANT:
-    #
-    # This bias is calculated progressively through the data.
-    # It does NOT look at the final structure and apply that
-    # answer backwards to earlier candles.
-    #
-    # At candle i, only structure confirmed at or before i
-    # can influence the bias.
+    # DETERMINE FINAL STRUCTURAL BIAS
     # =========================================================
 
     def determine_bias(self, df):
 
-        length = len(df)
-
-        biases = np.full(
-            length,
-            "neutral",
-            dtype=object
-        )
-
         structure = (
             df["structure"]
-            .to_numpy(dtype=object)
+            .dropna()
+            .to_numpy(
+                dtype=object
+            )
         )
 
-        latest_high_structure = None
+        if len(structure) < 2:
+            return "neutral"
 
+        latest_high_structure = None
         latest_low_structure = None
 
-        for i in range(length):
+        # -----------------------------------------------------
+        # Search backwards for the latest confirmed high
+        # and latest confirmed low structure.
+        # -----------------------------------------------------
 
-            value = structure[i]
+        for value in reversed(structure):
 
-            if value in (
-                "HH",
-                "LH"
+            if (
+                latest_high_structure
+                is None
+                and
+                value in ["HH", "LH"]
             ):
 
                 latest_high_structure = value
 
-            elif value in (
-                "HL",
-                "LL"
+            if (
+                latest_low_structure
+                is None
+                and
+                value in ["HL", "LL"]
             ):
 
                 latest_low_structure = value
 
             if (
-                latest_high_structure == "HH"
+                latest_high_structure
+                is not None
                 and
-                latest_low_structure == "HL"
+                latest_low_structure
+                is not None
             ):
 
-                biases[i] = "bullish"
+                break
 
-            elif (
-                latest_high_structure == "LH"
-                and
-                latest_low_structure == "LL"
-            ):
+        # -----------------------------------------------------
+        # BULLISH
+        # -----------------------------------------------------
 
-                biases[i] = "bearish"
+        if (
+            latest_high_structure == "HH"
+            and
+            latest_low_structure == "HL"
+        ):
 
-            else:
+            return "bullish"
 
-                biases[i] = "neutral"
+        # -----------------------------------------------------
+        # BEARISH
+        # -----------------------------------------------------
 
-        return biases
+        if (
+            latest_high_structure == "LH"
+            and
+            latest_low_structure == "LL"
+        ):
+
+            return "bearish"
+
+        return "neutral"
 
     # =========================================================
     # COMPLETE ANALYSIS
@@ -408,6 +393,10 @@ class MarketStructure:
     def analyze(self, df):
 
         df = df.copy()
+
+        # -----------------------------------------------------
+        # Validate columns
+        # -----------------------------------------------------
 
         required_columns = [
             "high",
@@ -429,23 +418,22 @@ class MarketStructure:
                 ", ".join(missing)
             )
 
+        # -----------------------------------------------------
+        # Detect swings
+        # -----------------------------------------------------
+
         df = self.detect_swings(df)
+
+        # -----------------------------------------------------
+        # Classify structure
+        # -----------------------------------------------------
 
         df = self.classify_structure(df)
 
-        biases = self.determine_bias(df)
+        # -----------------------------------------------------
+        # Determine final bias
+        # -----------------------------------------------------
 
-        df["structure_bias"] = biases
+        bias = self.determine_bias(df)
 
-        current_bias = (
-            biases[-1]
-            if length_safe(df) > 0
-            else "neutral"
-        )
-
-        return df, current_bias
-
-
-def length_safe(df):
-
-    return len(df)
+        return df, bias
