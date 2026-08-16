@@ -1,97 +1,214 @@
-class RiskManager:
+import numpy as np
+import pandas as pd
+
+
+class ConfirmationAnalyzer:
 
     def __init__(
         self,
-        risk_percent=1.0,
-        minimum_rr=2.0
+        rejection_wick_ratio=1.5
     ):
+        self.rejection_wick_ratio = rejection_wick_ratio
 
-        self.risk_percent = risk_percent
-        self.minimum_rr = minimum_rr
+    # =========================================================
+    # PREPARE COLUMNS
+    # =========================================================
 
-    def calculate_position_size(
-        self,
-        balance,
-        entry,
-        stop
-    ):
+    def add_columns(self, df):
 
-        risk_amount = (
-            balance
-            *
-            self.risk_percent
-            /
-            100
-        )
+        df = df.copy()
 
-        distance = abs(entry - stop)
+        columns = [
+            "bullish_engulfing",
+            "bearish_engulfing",
+            "bullish_rejection",
+            "bearish_rejection",
+            "displacement"
+        ]
 
-        if distance == 0:
-            return 0
+        for column in columns:
 
-        return risk_amount / distance
+            if column not in df.columns:
+                df[column] = False
 
-    def calculate_target(
-        self,
-        entry,
-        stop,
-        direction
-    ):
+        return df
 
-        risk = abs(entry - stop)
+    # =========================================================
+    # ENGULFING PATTERNS
+    # =========================================================
 
-        reward = (
-            risk * self.minimum_rr
-        )
+    def detect_engulfing(self, df):
 
-        if direction == "bullish":
+        df = df.copy()
 
-            return entry + reward
+        opens = df["open"].to_numpy(dtype=float)
+        closes = df["close"].to_numpy(dtype=float)
 
-        if direction == "bearish":
+        bullish = np.zeros(len(df), dtype=bool)
+        bearish = np.zeros(len(df), dtype=bool)
 
-            return entry - reward
+        for i in range(1, len(df)):
 
-        return None
+            previous_open = opens[i - 1]
+            previous_close = closes[i - 1]
 
-    def validate_trade(
-        self,
-        entry,
-        stop,
-        target,
-        direction
-    ):
+            current_open = opens[i]
+            current_close = closes[i]
 
-        risk = abs(entry - stop)
+            # Previous candle bearish,
+            # current candle bullish and engulfs it.
+            if (
+                previous_close < previous_open
+                and
+                current_close > current_open
+                and
+                current_open <= previous_close
+                and
+                current_close >= previous_open
+            ):
+                bullish[i] = True
 
-        reward = abs(target - entry)
+            # Previous candle bullish,
+            # current candle bearish and engulfs it.
+            elif (
+                previous_close > previous_open
+                and
+                current_close < current_open
+                and
+                current_open >= previous_close
+                and
+                current_close <= previous_open
+            ):
+                bearish[i] = True
 
-        if risk == 0:
-            return False
+        df["bullish_engulfing"] = bullish
+        df["bearish_engulfing"] = bearish
 
-        rr = reward / risk
+        return df
 
-        if rr < self.minimum_rr:
-            return False
+    # =========================================================
+    # REJECTION CANDLES
+    # =========================================================
 
-        if direction == "bullish":
+    def detect_rejection(self, df):
 
-            if stop >= entry:
-                return False
+        df = df.copy()
 
-            if target <= entry:
-                return False
+        opens = df["open"].to_numpy(dtype=float)
+        highs = df["high"].to_numpy(dtype=float)
+        lows = df["low"].to_numpy(dtype=float)
+        closes = df["close"].to_numpy(dtype=float)
 
-        elif direction == "bearish":
+        bullish = np.zeros(len(df), dtype=bool)
+        bearish = np.zeros(len(df), dtype=bool)
 
-            if stop <= entry:
-                return False
+        ratio = self.rejection_wick_ratio
 
-            if target >= entry:
-                return False
+        for i in range(len(df)):
 
-        else:
+            body = abs(closes[i] - opens[i])
 
-            return False
+            # Prevent a zero-body candle from causing
+            # division problems.
+            body = max(body, 1e-12)
 
-        return True
+            upper_wick = (
+                highs[i]
+                -
+                max(opens[i], closes[i])
+            )
+
+            lower_wick = (
+                min(opens[i], closes[i])
+                -
+                lows[i]
+            )
+
+            # Bullish rejection:
+            # large lower wick relative to body.
+            if (
+                lower_wick >= body * ratio
+                and
+                lower_wick > upper_wick
+            ):
+                bullish[i] = True
+
+            # Bearish rejection:
+            # large upper wick relative to body.
+            if (
+                upper_wick >= body * ratio
+                and
+                upper_wick > lower_wick
+            ):
+                bearish[i] = True
+
+        df["bullish_rejection"] = bullish
+        df["bearish_rejection"] = bearish
+
+        return df
+
+    # =========================================================
+    # DISPLACEMENT
+    # =========================================================
+
+    def detect_displacement(self, df):
+
+        df = df.copy()
+
+        opens = df["open"].to_numpy(dtype=float)
+        highs = df["high"].to_numpy(dtype=float)
+        lows = df["low"].to_numpy(dtype=float)
+        closes = df["close"].to_numpy(dtype=float)
+
+        displacement = np.zeros(len(df), dtype=bool)
+
+        if len(df) < 2:
+            df["displacement"] = displacement
+            return df
+
+        ranges = highs - lows
+
+        # Use only previous candles to determine whether
+        # the current candle is unusually large.
+        for i in range(1, len(df)):
+
+            previous_range = ranges[i - 1]
+
+            current_range = ranges[i]
+
+            if previous_range <= 0:
+                continue
+
+            body = abs(closes[i] - opens[i])
+
+            # Current candle must have both:
+            # 1. a larger-than-previous range
+            # 2. a meaningful body
+            if (
+                current_range >= previous_range * 1.5
+                and
+                body >= current_range * 0.5
+            ):
+                displacement[i] = True
+
+        df["displacement"] = displacement
+
+        return df
+
+    # =========================================================
+    # COMPLETE ANALYSIS
+    # =========================================================
+
+    def analyze(self, df):
+
+        df = df.copy()
+
+        df = self.add_columns(df)
+
+        df = self.detect_engulfing(df)
+
+        df = self.detect_rejection(df)
+
+        df = self.detect_displacement(df)
+
+        return df
