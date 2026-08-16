@@ -61,49 +61,33 @@ class LiquidityAnalyzer:
 
         df = df.copy()
 
-        highs = pd.to_numeric(
-            df["high"],
-            errors="coerce"
-        ).to_numpy(dtype=float)
+        highs = df["high"].to_numpy(
+            dtype=float
+        )
+
+        length = len(df)
 
         equal_high = np.zeros(
-            len(df),
+            length,
             dtype=bool
         )
 
         lookback = self.swing_lookback
-
         tolerance = self.equal_tolerance
 
         for i in range(
             lookback,
-            len(df)
+            length
         ):
 
             current_high = highs[i]
-
-            if not np.isfinite(
-                current_high
-            ):
-                continue
 
             previous_highs = highs[
                 i - lookback:i
             ]
 
-            valid_previous = (
-                previous_highs[
-                    np.isfinite(
-                        previous_highs
-                    )
-                ]
-            )
-
-            if len(valid_previous) == 0:
-                continue
-
             difference = np.abs(
-                valid_previous
+                previous_highs
                 -
                 current_high
             )
@@ -111,8 +95,8 @@ class LiquidityAnalyzer:
             relative_difference = (
                 difference
                 /
-                max(
-                    abs(current_high),
+                np.maximum(
+                    np.abs(current_high),
                     1e-12
                 )
             )
@@ -139,49 +123,33 @@ class LiquidityAnalyzer:
 
         df = df.copy()
 
-        lows = pd.to_numeric(
-            df["low"],
-            errors="coerce"
-        ).to_numpy(dtype=float)
+        lows = df["low"].to_numpy(
+            dtype=float
+        )
+
+        length = len(df)
 
         equal_low = np.zeros(
-            len(df),
+            length,
             dtype=bool
         )
 
         lookback = self.swing_lookback
-
         tolerance = self.equal_tolerance
 
         for i in range(
             lookback,
-            len(df)
+            length
         ):
 
             current_low = lows[i]
-
-            if not np.isfinite(
-                current_low
-            ):
-                continue
 
             previous_lows = lows[
                 i - lookback:i
             ]
 
-            valid_previous = (
-                previous_lows[
-                    np.isfinite(
-                        previous_lows
-                    )
-                ]
-            )
-
-            if len(valid_previous) == 0:
-                continue
-
             difference = np.abs(
-                valid_previous
+                previous_lows
                 -
                 current_low
             )
@@ -189,8 +157,8 @@ class LiquidityAnalyzer:
             relative_difference = (
                 difference
                 /
-                max(
-                    abs(current_low),
+                np.maximum(
+                    np.abs(current_low),
                     1e-12
                 )
             )
@@ -222,7 +190,6 @@ class LiquidityAnalyzer:
 
         df["buy_side_liquidity"] = (
             df["equal_high"]
-            .astype(bool)
         )
 
         return df
@@ -240,7 +207,6 @@ class LiquidityAnalyzer:
 
         df["sell_side_liquidity"] = (
             df["equal_low"]
-            .astype(bool)
         )
 
         return df
@@ -249,14 +215,13 @@ class LiquidityAnalyzer:
     # BUY-SIDE LIQUIDITY SWEEP
     # =========================================================
     #
-    # Buy-side liquidity sits above highs.
+    # A buy-side sweep occurs when:
     #
-    # A bearish buy-side sweep occurs when:
+    # 1. Price has established buy-side liquidity.
+    # 2. Price trades ABOVE that liquidity.
+    # 3. Price CLOSES BACK BELOW that liquidity.
     #
-    # 1. Price trades ABOVE the liquidity level.
-    # 2. The candle CLOSES BACK BELOW the level.
-    #
-    # This prevents simply calling every breakout a sweep.
+    # This avoids treating a simple breakout as a sweep.
     # =========================================================
 
     def detect_buy_side_sweeps(
@@ -266,19 +231,18 @@ class LiquidityAnalyzer:
 
         df = df.copy()
 
-        highs = pd.to_numeric(
-            df["high"],
-            errors="coerce"
-        ).to_numpy(dtype=float)
+        highs = df["high"].to_numpy(
+            dtype=float
+        )
 
-        closes = pd.to_numeric(
-            df["close"],
-            errors="coerce"
-        ).to_numpy(dtype=float)
+        closes = df["close"].to_numpy(
+            dtype=float
+        )
 
-        equal_highs = (
-            df["equal_high"]
-            .to_numpy(dtype=bool)
+        equal_highs = df[
+            "equal_high"
+        ].to_numpy(
+            dtype=bool
         )
 
         sweeps = np.zeros(
@@ -288,39 +252,27 @@ class LiquidityAnalyzer:
 
         last_liquidity_high = None
 
-        for i in range(
-            len(df)
-        ):
+        for i in range(len(df)):
 
             # -------------------------------------------------
-            # Register new liquidity
+            # Establish / update liquidity
             # -------------------------------------------------
 
             if equal_highs[i]:
 
-                if np.isfinite(
+                last_liquidity_high = (
                     highs[i]
-                ):
+                )
 
-                    last_liquidity_high = (
-                        highs[i]
-                    )
-
-                # Do not allow the same candle that creates
-                # liquidity to immediately sweep itself.
                 continue
 
             # -------------------------------------------------
-            # Test for sweep
+            # Detect sweep
             # -------------------------------------------------
 
             if (
                 last_liquidity_high
                 is not None
-                and
-                np.isfinite(highs[i])
-                and
-                np.isfinite(closes[i])
             ):
 
                 swept_above = (
@@ -343,24 +295,26 @@ class LiquidityAnalyzer:
 
                     sweeps[i] = True
 
+                    # Liquidity has been consumed.
                     last_liquidity_high = None
 
-        df["buy_side_sweep"] = (
-            sweeps
-        )
+        df[
+            "buy_side_sweep"
+        ] = sweeps
 
         return df
 
     # =========================================================
-    # SELL-SIDE LIQUIDITY SWEEP
+    # SELL-SIDE LIQUIDITY SWEEPS
     # =========================================================
     #
-    # Sell-side liquidity sits below lows.
+    # A sell-side sweep occurs when:
     #
-    # A bullish sell-side sweep occurs when:
+    # 1. Price has established sell-side liquidity.
+    # 2. Price trades BELOW that liquidity.
+    # 3. Price CLOSES BACK ABOVE that liquidity.
     #
-    # 1. Price trades BELOW the liquidity level.
-    # 2. The candle CLOSES BACK ABOVE the level.
+    # This avoids treating a simple breakdown as a sweep.
     # =========================================================
 
     def detect_sell_side_sweeps(
@@ -370,19 +324,18 @@ class LiquidityAnalyzer:
 
         df = df.copy()
 
-        lows = pd.to_numeric(
-            df["low"],
-            errors="coerce"
-        ).to_numpy(dtype=float)
+        lows = df["low"].to_numpy(
+            dtype=float
+        )
 
-        closes = pd.to_numeric(
-            df["close"],
-            errors="coerce"
-        ).to_numpy(dtype=float)
+        closes = df["close"].to_numpy(
+            dtype=float
+        )
 
-        equal_lows = (
-            df["equal_low"]
-            .to_numpy(dtype=bool)
+        equal_lows = df[
+            "equal_low"
+        ].to_numpy(
+            dtype=bool
         )
 
         sweeps = np.zeros(
@@ -392,38 +345,27 @@ class LiquidityAnalyzer:
 
         last_liquidity_low = None
 
-        for i in range(
-            len(df)
-        ):
+        for i in range(len(df)):
 
             # -------------------------------------------------
-            # Register new liquidity
+            # Establish / update liquidity
             # -------------------------------------------------
 
             if equal_lows[i]:
 
-                if np.isfinite(
+                last_liquidity_low = (
                     lows[i]
-                ):
+                )
 
-                    last_liquidity_low = (
-                        lows[i]
-                    )
-
-                # Do not allow the same candle to sweep itself.
                 continue
 
             # -------------------------------------------------
-            # Test for sweep
+            # Detect sweep
             # -------------------------------------------------
 
             if (
                 last_liquidity_low
                 is not None
-                and
-                np.isfinite(lows[i])
-                and
-                np.isfinite(closes[i])
             ):
 
                 swept_below = (
@@ -446,11 +388,12 @@ class LiquidityAnalyzer:
 
                     sweeps[i] = True
 
+                    # Liquidity has been consumed.
                     last_liquidity_low = None
 
-        df["sell_side_sweep"] = (
-            sweeps
-        )
+        df[
+            "sell_side_sweep"
+        ] = sweeps
 
         return df
 
@@ -462,38 +405,11 @@ class LiquidityAnalyzer:
 
         df = df.copy()
 
-        required_columns = [
-            "high",
-            "low",
-            "close"
-        ]
+        df = self.add_columns(df)
 
-        missing = [
-            column
-            for column in required_columns
-            if column not in df.columns
-        ]
+        df = self.find_equal_highs(df)
 
-        if missing:
-
-            raise ValueError(
-                "Missing required liquidity "
-                "columns: "
-                +
-                ", ".join(missing)
-            )
-
-        df = self.add_columns(
-            df
-        )
-
-        df = self.find_equal_highs(
-            df
-        )
-
-        df = self.find_equal_lows(
-            df
-        )
+        df = self.find_equal_lows(df)
 
         df = self.identify_buy_side_liquidity(
             df
