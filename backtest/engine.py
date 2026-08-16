@@ -33,6 +33,15 @@ class BacktestEngine:
 
         self.trades = []
 
+        # Diagnostic counters — why did a signal NOT become a trade?
+        self.diagnostics = {
+            "signals_seen": 0,
+            "rejected_no_stop": 0,
+            "rejected_invalid_trade": 0,
+            "opened": 0,
+            "sample_rejections": []
+        }
+
     # =========================================================
     # PREPARE DATA
     # =========================================================
@@ -113,11 +122,27 @@ class BacktestEngine:
 
             return None
 
+        self.diagnostics["signals_seen"] += 1
+
         stop = self.risk.find_structural_stop(
             df,
             signal_index,
             trade_direction
         )
+
+        if stop is None:
+
+            self.diagnostics["rejected_no_stop"] += 1
+
+            if len(self.diagnostics["sample_rejections"]) < 5:
+                self.diagnostics["sample_rejections"].append({
+                    "reason": "no_stop",
+                    "signal_index": signal_index,
+                    "direction": trade_direction,
+                    "entry": entry
+                })
+
+            return None
 
         target = self.risk.calculate_target(
             entry,
@@ -134,7 +159,21 @@ class BacktestEngine:
 
         if not valid:
 
+            self.diagnostics["rejected_invalid_trade"] += 1
+
+            if len(self.diagnostics["sample_rejections"]) < 5:
+                self.diagnostics["sample_rejections"].append({
+                    "reason": "invalid_trade",
+                    "signal_index": signal_index,
+                    "direction": trade_direction,
+                    "entry": entry,
+                    "stop": stop,
+                    "target": target
+                })
+
             return None
+
+        self.diagnostics["opened"] += 1
 
         position_size = (
             self.risk.calculate_position_size(
@@ -326,5 +365,17 @@ class BacktestEngine:
                 trade["result"] = "OPEN_AT_END"
 
                 trade["exit_index"] = length - 1
+
+        print()
+        print("=" * 55)
+        print("DIAGNOSTICS")
+        print("=" * 55)
+        print("Signals seen:          ", self.diagnostics["signals_seen"])
+        print("Rejected (no stop):    ", self.diagnostics["rejected_no_stop"])
+        print("Rejected (invalid RR): ", self.diagnostics["rejected_invalid_trade"])
+        print("Opened:                ", self.diagnostics["opened"])
+        print()
+        for sample in self.diagnostics["sample_rejections"]:
+            print(sample)
 
         return self.trades, df, bias
