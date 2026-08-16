@@ -1,178 +1,121 @@
-/*
-============================================================
-AUREUS AI — CHART ENGINE
-============================================================
-*/
+/* =========================================================
+   AUREUS AI — CHART CONTROLLER
+   ========================================================= */
 
-let aureusChart = null;
-let candleSeries = null;
+class AureusChart {
 
-function initializeChart(containerId) {
+    constructor(containerId) {
 
-    const container =
-        document.getElementById(containerId);
+        this.container =
+            document.getElementById(
+                containerId
+            );
 
-    if (!container) return;
+        this.chart = null;
 
-    if (
-        typeof LightweightCharts ===
-        "undefined"
-    ) {
-
-        console.error(
-            "Lightweight Charts library not loaded."
-        );
-
-        return;
+        this.series = null;
 
     }
 
-    aureusChart =
-        LightweightCharts.createChart(
-            container,
-            {
 
-                layout: {
+    create() {
 
-                    background: {
-                        color: "#090d14"
-                    },
+        if (!this.container) {
 
-                    textColor: "#9aa4b2"
+            console.warn(
+                "AUREUS chart container not found."
+            );
 
-                },
-
-                grid: {
-
-                    vertLines: {
-                        color: "#151b25"
-                    },
-
-                    horzLines: {
-                        color: "#151b25"
-                    }
-
-                },
-
-                width:
-                    container.clientWidth,
-
-                height: 500,
-
-                timeScale: {
-
-                    timeVisible: true,
-
-                    secondsVisible: false
-
-                }
-
-            }
-        );
-
-
-    candleSeries =
-        aureusChart.addCandlestickSeries({
-
-            upColor: "#00c896",
-
-            downColor: "#ff4d67",
-
-            borderUpColor: "#00c896",
-
-            borderDownColor: "#ff4d67",
-
-            wickUpColor: "#00c896",
-
-            wickDownColor: "#ff4d67"
-
-        });
-
-
-    window.addEventListener(
-        "resize",
-        () => {
-
-            aureusChart.applyOptions({
-
-                width:
-                    container.clientWidth
-
-            });
+            return;
 
         }
-    );
-
-}
 
 
-function loadChartData(
-    candles
-) {
+        /*
+         * The real TradingView-style chart
+         * will be connected once we add
+         * the market-data provider.
+         *
+         * For now this creates the visual
+         * chart area without requiring
+         * paid market data.
+         */
 
-    if (
-        !candleSeries
-    ) return;
+        this.container.innerHTML = `
+            <div class="chart-placeholder">
+
+                <div class="chart-placeholder-grid"></div>
+
+                <div class="chart-placeholder-content">
+
+                    <div class="chart-symbol">
+                        XAU/USD
+                    </div>
+
+                    <div class="chart-price">
+                        MARKET DATA OFFLINE
+                    </div>
+
+                    <p>
+                        Connect a market-data provider
+                        to display live candles.
+                    </p>
+
+                </div>
+
+            </div>
+        `;
+
+    }
 
 
-    const formatted =
-        candles.map(
-            candle => ({
+    setCandles(candles) {
 
-                time:
-                    Math.floor(
-                        new Date(
-                            candle.timestamp
-                        ).getTime()
-                        / 1000
-                    ),
+        if (!candles || !candles.length) {
 
-                open:
-                    candle.open,
+            return;
 
-                high:
-                    candle.high,
+        }
 
-                low:
-                    candle.low,
 
-                close:
-                    candle.close
-
-            })
+        console.log(
+            "Candles received:",
+            candles.length
         );
 
-
-    candleSeries.setData(
-        formatted
-    );
+    }
 
 
-    aureusChart.timeScale()
-        .fitContent();
+    clear() {
 
-}
+        if (this.container) {
 
+            this.container.innerHTML = "";
 
-function clearChart() {
-
-    if (
-        candleSeries
-    ) {
-
-        candleSeries.setData([]);
+        }
 
     }
 
 }
 
 
-window.AureusChart = {
+/* ---------------------------------------------------------
+   INITIALIZE CHART
+--------------------------------------------------------- */
 
-    initializeChart,
+document.addEventListener(
+    "DOMContentLoaded",
+    () => {
 
-    loadChartData,
+        const chart =
+            new AureusChart(
+                "aureusChart"
+            );
 
-    clearChart
+        chart.create();
 
-};
+        window.aureusChart =
+            chart;
+
+    }
+);
