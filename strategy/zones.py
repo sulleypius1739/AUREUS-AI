@@ -1,14 +1,14 @@
 import pandas as pd
+import numpy as np
 
 
 class ZoneAnalyzer:
 
     def __init__(self, fvg_min_size=0.0):
-
         self.fvg_min_size = fvg_min_size
 
     # =========================================================
-    # PREPARE COLUMNS
+    # ADD REQUIRED COLUMNS
     # =========================================================
 
     def add_columns(self, df):
@@ -16,154 +16,109 @@ class ZoneAnalyzer:
         df = df.copy()
 
         columns = [
-
             "support",
             "resistance",
-
             "demand",
             "supply",
-
             "bullish_order_block",
             "bearish_order_block",
-
             "bullish_fvg",
             "bearish_fvg",
-
             "displacement"
-
         ]
 
         for column in columns:
 
             if column not in df.columns:
-
                 df[column] = False
 
         return df
 
     # =========================================================
-    # SUPPORT AND RESISTANCE
+    # SUPPORT / RESISTANCE
     # =========================================================
 
     def detect_support_resistance(self, df):
 
         df = df.copy()
 
-        for i in range(1, len(df) - 1):
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
 
-            current_low = df.iloc[i]["low"]
-            previous_low = df.iloc[i - 1]["low"]
-            next_low = df.iloc[i + 1]["low"]
+        support = np.zeros(
+            len(df),
+            dtype=bool
+        )
 
-            current_high = df.iloc[i]["high"]
-            previous_high = df.iloc[i - 1]["high"]
-            next_high = df.iloc[i + 1]["high"]
+        resistance = np.zeros(
+            len(df),
+            dtype=bool
+        )
 
-            # -------------------------------------------------
-            # SUPPORT
-            # -------------------------------------------------
+        if len(df) >= 3:
 
-            if (
-                current_low < previous_low
-                and
-                current_low < next_low
-            ):
+            # Current candle compared with candle immediately
+            # before and after it.
 
-                df.loc[
-                    df.index[i],
-                    "support"
-                ] = True
+            support[1:-1] = (
+                (lows[1:-1] < lows[:-2])
+                &
+                (lows[1:-1] < lows[2:])
+            )
 
-            # -------------------------------------------------
-            # RESISTANCE
-            # -------------------------------------------------
+            resistance[1:-1] = (
+                (highs[1:-1] > highs[:-2])
+                &
+                (highs[1:-1] > highs[2:])
+            )
 
-            if (
-                current_high > previous_high
-                and
-                current_high > next_high
-            ):
-
-                df.loc[
-                    df.index[i],
-                    "resistance"
-                ] = True
+        df["support"] = support
+        df["resistance"] = resistance
 
         return df
 
     # =========================================================
-    # SUPPLY AND DEMAND
+    # SUPPLY / DEMAND
     # =========================================================
 
     def detect_supply_demand(self, df):
 
         df = df.copy()
 
-        for i in range(1, len(df)):
+        opens = df["open"].to_numpy()
+        closes = df["close"].to_numpy()
 
-            previous = df.iloc[i - 1]
-            current = df.iloc[i]
+        bullish = closes > opens
+        bearish = closes < opens
 
-            previous_bearish = (
-                previous["close"]
-                <
-                previous["open"]
+        demand = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        supply = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        # Previous candle bearish + current bullish
+        if len(df) >= 2:
+
+            demand[:-1] = (
+                bearish[:-1]
+                &
+                bullish[1:]
             )
 
-            previous_bullish = (
-                previous["close"]
-                >
-                previous["open"]
+            # Previous candle bullish + current bearish
+            supply[:-1] = (
+                bullish[:-1]
+                &
+                bearish[1:]
             )
 
-            current_bullish = (
-                current["close"]
-                >
-                current["open"]
-            )
-
-            current_bearish = (
-                current["close"]
-                <
-                current["open"]
-            )
-
-            # -------------------------------------------------
-            # DEMAND
-            # -------------------------------------------------
-            #
-            # Bearish candle followed by bullish movement.
-            # This is a basic candidate definition.
-            #
-            # Later we will require displacement and
-            # structural confirmation.
-            # -------------------------------------------------
-
-            if (
-                previous_bearish
-                and
-                current_bullish
-            ):
-
-                df.loc[
-                    df.index[i - 1],
-                    "demand"
-                ] = True
-
-            # -------------------------------------------------
-            # SUPPLY
-            # -------------------------------------------------
-
-            if (
-                previous_bullish
-                and
-                current_bearish
-            ):
-
-                df.loc[
-                    df.index[i - 1],
-                    "supply"
-                ] = True
+        df["demand"] = demand
+        df["supply"] = supply
 
         return df
 
@@ -175,68 +130,52 @@ class ZoneAnalyzer:
 
         df = df.copy()
 
-        for i in range(1, len(df)):
+        opens = df["open"].to_numpy()
+        closes = df["close"].to_numpy()
 
-            previous = df.iloc[i - 1]
-            current = df.iloc[i]
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
 
-            previous_bearish = (
-                previous["close"]
-                <
-                previous["open"]
-            )
+        bullish = closes > opens
+        bearish = closes < opens
 
-            previous_bullish = (
-                previous["close"]
-                >
-                previous["open"]
-            )
+        bullish_order_block = np.zeros(
+            len(df),
+            dtype=bool
+        )
 
-            # -------------------------------------------------
-            # BULLISH ORDER BLOCK
-            # -------------------------------------------------
-            #
+        bearish_order_block = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        if len(df) >= 2:
+
             # Last bearish candle before bullish displacement
-            # through the previous high.
-            # -------------------------------------------------
-
-            bullish_displacement = (
-                current["close"]
-                >
-                previous["high"]
+            bullish_order_block[:-1] = (
+                bearish[:-1]
+                &
+                bullish[1:]
+                &
+                (closes[1:] > highs[:-1])
             )
 
-            if (
-                previous_bearish
-                and
-                bullish_displacement
-            ):
-
-                df.loc[
-                    df.index[i - 1],
-                    "bullish_order_block"
-                ] = True
-
-            # -------------------------------------------------
-            # BEARISH ORDER BLOCK
-            # -------------------------------------------------
-
-            bearish_displacement = (
-                current["close"]
-                <
-                previous["low"]
+            # Last bullish candle before bearish displacement
+            bearish_order_block[:-1] = (
+                bullish[:-1]
+                &
+                bearish[1:]
+                &
+                (closes[1:] < lows[:-1])
             )
 
-            if (
-                previous_bullish
-                and
-                bearish_displacement
-            ):
+        df[
+            "bullish_order_block"
+        ] = bullish_order_block
 
-                df.loc[
-                    df.index[i - 1],
-                    "bearish_order_block"
-                ] = True
+        df[
+            "bearish_order_block"
+        ] = bearish_order_block
 
         return df
 
@@ -248,71 +187,55 @@ class ZoneAnalyzer:
 
         df = df.copy()
 
-        for i in range(2, len(df)):
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
 
-            first = df.iloc[i - 2]
-            middle = df.iloc[i - 1]
-            third = df.iloc[i]
+        bullish_fvg = np.zeros(
+            len(df),
+            dtype=bool
+        )
 
-            # -------------------------------------------------
-            # BULLISH FVG
-            # -------------------------------------------------
-            #
-            # Third candle low remains above first candle high.
-            #
-            #       First       Third
-            #         │           │
-            #       High         Low
-            #          \         /
-            #           \  GAP  /
-            #
-            # -------------------------------------------------
+        bearish_fvg = np.zeros(
+            len(df),
+            dtype=bool
+        )
 
+        if len(df) >= 3:
+
+            # Bullish FVG:
+            #
+            # candle 3 low > candle 1 high
+            #
             bullish_gap = (
-                third["low"]
-                >
-                first["high"]
+                lows[2:]
+                -
+                highs[:-2]
             )
 
-            if bullish_gap:
+            bullish_fvg[2:] = (
+                bullish_gap
+                >=
+                self.fvg_min_size
+            )
 
-                gap_size = (
-                    third["low"]
-                    -
-                    first["high"]
-                )
-
-                if gap_size >= self.fvg_min_size:
-
-                    df.loc[
-                        df.index[i],
-                        "bullish_fvg"
-                    ] = True
-
-            # -------------------------------------------------
-            # BEARISH FVG
-            # -------------------------------------------------
+            # Bearish FVG:
+            #
+            # candle 3 high < candle 1 low
 
             bearish_gap = (
-                third["high"]
-                <
-                first["low"]
+                lows[:-2]
+                -
+                highs[2:]
             )
 
-            if bearish_gap:
+            bearish_fvg[2:] = (
+                bearish_gap
+                >=
+                self.fvg_min_size
+            )
 
-                gap_size = (
-                    first["low"]
-                    -
-                    third["high"]
-                )
-
-                if gap_size >= self.fvg_min_size:
-
-                    df.loc[
-                        df.index[i],
-                        "bearish_fvg"
-                    ] = True
+        df["bullish_fvg"] = bullish_fvg
+        df["bearish_fvg"] = bearish_fvg
 
         return df
 
@@ -324,51 +247,36 @@ class ZoneAnalyzer:
 
         df = df.copy()
 
-        for i in range(1, len(df)):
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
 
-            current = df.iloc[i]
-            previous = df.iloc[i - 1]
+        candle_range = highs - lows
 
-            current_range = (
-                current["high"]
-                -
-                current["low"]
+        displacement = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        if len(df) >= 2:
+
+            valid_previous = candle_range[:-1] > 0
+
+            displacement[1:] = (
+                valid_previous
+                &
+                (
+                    candle_range[1:]
+                    >=
+                    candle_range[:-1] * 1.5
+                )
             )
 
-            previous_range = (
-                previous["high"]
-                -
-                previous["low"]
-            )
-
-            if previous_range <= 0:
-
-                continue
-
-            # -------------------------------------------------
-            # Basic displacement definition:
-            #
-            # Current candle range >= 1.5 × previous range
-            #
-            # This will later be improved using ATR and
-            # directional body size.
-            # -------------------------------------------------
-
-            if (
-                current_range
-                >=
-                previous_range * 1.5
-            ):
-
-                df.loc[
-                    df.index[i],
-                    "displacement"
-                ] = True
+        df["displacement"] = displacement
 
         return df
 
     # =========================================================
-    # COMPLETE ZONE ANALYSIS
+    # COMPLETE ANALYSIS
     # =========================================================
 
     def analyze(self, df):
