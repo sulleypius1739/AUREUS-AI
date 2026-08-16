@@ -1,0 +1,10 @@
+{
+  "name": "aureus-ai",
+  "version": "0.1.0",
+  "description": "Aureus AI universal market analysis and backtesting system",
+  "main": "engine/analysisEngine.js",
+  "scripts": {
+    "backtest": "node scripts/runBacktest.js"
+  },
+  "private": true
+}
