@@ -40,10 +40,6 @@ class RiskManager:
     # =========================================================
     # ATR
     # =========================================================
-    #
-    # Average true range over the lookback window, using only
-    # candles up to and including `index`. No look-ahead.
-    # =========================================================
 
     def calculate_atr(
         self,
@@ -84,14 +80,13 @@ class RiskManager:
     # STRUCTURAL STOP LOSS
     # =========================================================
     #
-    # Looks backward from `index` for the most recent order
-    # block in the trade direction. Falls back to the most
-    # recent swing low/high. Falls back to the current
-    # candle's own low/high only if nothing structural exists
-    # within the lookback window.
-    #
-    # Mirrors the logic in riskEngine.js so both systems place
-    # stops the same way.
+    # UPDATED to use the CONFIRMED columns from zones.py /
+    # market_structure.py — bullish_order_block /
+    # bearish_order_block are now confirmation-indexed (see
+    # zones.py), and swing_low_confirmed / swing_high_confirmed
+    # (see market_structure.py) are confirmation-indexed too.
+    # Using the old raw swing_high/swing_low columns here would
+    # have silently reintroduced look-ahead into stop placement.
     # =========================================================
 
     def find_structural_stop(
@@ -117,13 +112,17 @@ class RiskManager:
         if direction == "bullish":
 
             ob_column = "bullish_order_block"
-            swing_column = "swing_low"
+            ob_level_column = "bullish_order_block_level"
+            swing_column = "swing_low_confirmed"
+            swing_level_column = "swing_low_price"
             price_column = "low"
 
         elif direction == "bearish":
 
             ob_column = "bearish_order_block"
-            swing_column = "swing_high"
+            ob_level_column = "bearish_order_block_level"
+            swing_column = "swing_high_confirmed"
+            swing_level_column = "swing_high_price"
             price_column = "high"
 
         else:
@@ -131,36 +130,44 @@ class RiskManager:
             return float(df.iloc[index]["low"])
 
         # -----------------------------------------------------
-        # 1. Most recent order block within the lookback window
+        # 1. Most recent CONFIRMED order block in range
         # -----------------------------------------------------
 
         for i in range(index - 1, start - 1, -1):
 
             if bool(df.iloc[i].get(ob_column, False)):
 
-                level = float(df.iloc[i][price_column])
+                level = df.iloc[i].get(ob_level_column)
 
-                return (
-                    level - buffer
-                    if direction == "bullish"
-                    else level + buffer
-                )
+                if level is not None and level == level:  # not NaN
+
+                    level = float(level)
+
+                    return (
+                        level - buffer
+                        if direction == "bullish"
+                        else level + buffer
+                    )
 
         # -----------------------------------------------------
-        # 2. Most recent swing point within the lookback window
+        # 2. Most recent CONFIRMED swing point in range
         # -----------------------------------------------------
 
         for i in range(index - 1, start - 1, -1):
 
             if bool(df.iloc[i].get(swing_column, False)):
 
-                level = float(df.iloc[i][price_column])
+                level = df.iloc[i].get(swing_level_column)
 
-                return (
-                    level - buffer
-                    if direction == "bullish"
-                    else level + buffer
-                )
+                if level is not None and level == level:  # not NaN
+
+                    level = float(level)
+
+                    return (
+                        level - buffer
+                        if direction == "bullish"
+                        else level + buffer
+                    )
 
         # -----------------------------------------------------
         # 3. Fallback — current candle's own low/high
