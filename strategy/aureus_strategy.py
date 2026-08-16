@@ -6,6 +6,22 @@ from strategy.risk_management import RiskManager
 
 
 class AureusStrategy:
+    """
+    AUREUS AI core strategy.
+
+    The strategy is built around:
+
+        1. Market structure
+        2. Liquidity
+        3. Price zones
+        4. Candle confirmation
+        5. Confluence scoring
+
+    IMPORTANT:
+    The individual analyzers are responsible for creating
+    their respective features. This class combines those
+    features into a trading decision.
+    """
 
     def __init__(
         self,
@@ -37,37 +53,142 @@ class AureusStrategy:
 
         df = df.copy()
 
-        # -------------------------
+        # -----------------------------------------------------
+        # Basic validation
+        # -----------------------------------------------------
+
+        required_columns = [
+            "open",
+            "high",
+            "low",
+            "close"
+        ]
+
+        missing_columns = [
+            column
+            for column in required_columns
+            if column not in df.columns
+        ]
+
+        if missing_columns:
+
+            raise ValueError(
+                "Missing required market columns: "
+                + ", ".join(missing_columns)
+            )
+
+        # -----------------------------------------------------
+        # Ensure numerical OHLC data
+        # -----------------------------------------------------
+
+        for column in required_columns:
+
+            df[column] = (
+                df[column]
+                .astype(float)
+            )
+
+        # -----------------------------------------------------
+        # Remove invalid OHLC rows
+        # -----------------------------------------------------
+
+        df = df.dropna(
+            subset=required_columns
+        ).copy()
+
+        # -----------------------------------------------------
         # MARKET STRUCTURE
-        # -------------------------
+        # -----------------------------------------------------
 
-        df, bias = self.market_structure.analyze(df)
+        df, bias = (
+            self.market_structure.analyze(df)
+        )
 
-        # -------------------------
+        # -----------------------------------------------------
         # LIQUIDITY
-        # -------------------------
+        # -----------------------------------------------------
 
-        df = self.liquidity.analyze(df)
+        df = self.liquidity.analyze(
+            df
+        )
 
-        # -------------------------
+        # -----------------------------------------------------
         # ZONES
-        # -------------------------
+        # -----------------------------------------------------
 
-        df = self.zones.analyze(df)
+        df = self.zones.analyze(
+            df
+        )
 
-        # -------------------------
+        # -----------------------------------------------------
         # CANDLE CONFIRMATION
-        # -------------------------
+        # -----------------------------------------------------
 
-        df = self.confirmations.analyze(df)
+        df = self.confirmations.analyze(
+            df
+        )
 
         return df, bias
+
+    # =========================================================
+    # UTILITY
+    # =========================================================
+
+    @staticmethod
+    def _is_true(row, column):
+
+        value = row.get(
+            column,
+            False
+        )
+
+        if value is None:
+
+            return False
+
+        try:
+
+            return bool(value)
+
+        except Exception:
+
+            return False
 
     # =========================================================
     # SCORE CURRENT CANDLE
     # =========================================================
 
-    def score_candle(self, row):
+    def score_candle(
+        self,
+        row,
+        bias=None
+    ):
+        """
+        Determine whether the current candle contains a
+        valid AUREUS setup.
+
+        Scoring hierarchy:
+
+        PRIMARY CONDITIONS
+        ------------------
+        Liquidity sweep      = 2 points
+
+        SECONDARY CONDITIONS
+        --------------------
+        Order block          = 1 point
+        Fair value gap       = 1 point
+        Candle confirmation  = 1 point
+        Displacement         = 1 point
+
+        A trade requires the minimum score AND directional
+        agreement.
+
+        Market structure bias can be supplied as:
+
+            bullish
+            bearish
+            neutral
+        """
 
         bullish_score = 0
         bearish_score = 0
@@ -76,10 +197,20 @@ class AureusStrategy:
         bearish_reasons = []
 
         # =====================================================
-        # LIQUIDITY
+        # 1. LIQUIDITY
         # =====================================================
 
-        if row.get("sell_side_sweep", False):
+        bullish_sweep = self._is_true(
+            row,
+            "sell_side_sweep"
+        )
+
+        bearish_sweep = self._is_true(
+            row,
+            "buy_side_sweep"
+        )
+
+        if bullish_sweep:
 
             bullish_score += 2
 
@@ -87,7 +218,7 @@ class AureusStrategy:
                 "Sell-side liquidity sweep"
             )
 
-        if row.get("buy_side_sweep", False):
+        if bearish_sweep:
 
             bearish_score += 2
 
@@ -96,13 +227,20 @@ class AureusStrategy:
             )
 
         # =====================================================
-        # ORDER BLOCK
+        # 2. ORDER BLOCK
         # =====================================================
 
-        if row.get(
-            "bullish_order_block",
-            False
-        ):
+        bullish_ob = self._is_true(
+            row,
+            "bullish_order_block"
+        )
+
+        bearish_ob = self._is_true(
+            row,
+            "bearish_order_block"
+        )
+
+        if bullish_ob:
 
             bullish_score += 1
 
@@ -110,10 +248,7 @@ class AureusStrategy:
                 "Bullish order block"
             )
 
-        if row.get(
-            "bearish_order_block",
-            False
-        ):
+        if bearish_ob:
 
             bearish_score += 1
 
@@ -122,13 +257,20 @@ class AureusStrategy:
             )
 
         # =====================================================
-        # FAIR VALUE GAP
+        # 3. FAIR VALUE GAP
         # =====================================================
 
-        if row.get(
-            "bullish_fvg",
-            False
-        ):
+        bullish_fvg = self._is_true(
+            row,
+            "bullish_fvg"
+        )
+
+        bearish_fvg = self._is_true(
+            row,
+            "bearish_fvg"
+        )
+
+        if bullish_fvg:
 
             bullish_score += 1
 
@@ -136,10 +278,7 @@ class AureusStrategy:
                 "Bullish fair value gap"
             )
 
-        if row.get(
-            "bearish_fvg",
-            False
-        ):
+        if bearish_fvg:
 
             bearish_score += 1
 
@@ -148,13 +287,34 @@ class AureusStrategy:
             )
 
         # =====================================================
-        # CANDLE CONFIRMATION
+        # 4. CANDLE CONFIRMATION
         # =====================================================
 
-        if row.get(
-            "bullish_engulfing",
-            False
-        ):
+        bullish_engulfing = self._is_true(
+            row,
+            "bullish_engulfing"
+        )
+
+        bearish_engulfing = self._is_true(
+            row,
+            "bearish_engulfing"
+        )
+
+        bullish_rejection = self._is_true(
+            row,
+            "bullish_rejection"
+        )
+
+        bearish_rejection = self._is_true(
+            row,
+            "bearish_rejection"
+        )
+
+        # -----------------------------------------------------
+        # Bullish candle confirmation
+        # -----------------------------------------------------
+
+        if bullish_engulfing:
 
             bullish_score += 1
 
@@ -162,21 +322,7 @@ class AureusStrategy:
                 "Bullish engulfing"
             )
 
-        if row.get(
-            "bearish_engulfing",
-            False
-        ):
-
-            bearish_score += 1
-
-            bearish_reasons.append(
-                "Bearish engulfing"
-            )
-
-        if row.get(
-            "bullish_rejection",
-            False
-        ):
+        if bullish_rejection:
 
             bullish_score += 1
 
@@ -184,10 +330,19 @@ class AureusStrategy:
                 "Bullish rejection"
             )
 
-        if row.get(
-            "bearish_rejection",
-            False
-        ):
+        # -----------------------------------------------------
+        # Bearish candle confirmation
+        # -----------------------------------------------------
+
+        if bearish_engulfing:
+
+            bearish_score += 1
+
+            bearish_reasons.append(
+                "Bearish engulfing"
+            )
+
+        if bearish_rejection:
 
             bearish_score += 1
 
@@ -196,16 +351,23 @@ class AureusStrategy:
             )
 
         # =====================================================
-        # DISPLACEMENT
+        # 5. DISPLACEMENT
         # =====================================================
 
-        if row.get(
-            "displacement",
-            False
-        ):
+        displacement = self._is_true(
+            row,
+            "displacement"
+        )
 
-            close = row["close"]
-            open_price = row["open"]
+        if displacement:
+
+            close = float(
+                row["close"]
+            )
+
+            open_price = float(
+                row["open"]
+            )
 
             if close > open_price:
 
@@ -224,14 +386,91 @@ class AureusStrategy:
                 )
 
         # =====================================================
-        # FINAL DECISION
+        # DETERMINE RAW DIRECTION
         # =====================================================
 
-        if (
+        bullish_candidate = (
             bullish_score >= self.minimum_score
             and
             bullish_score > bearish_score
-        ):
+        )
+
+        bearish_candidate = (
+            bearish_score >= self.minimum_score
+            and
+            bearish_score > bullish_score
+        )
+
+        # =====================================================
+        # MARKET STRUCTURE FILTER
+        # =====================================================
+        #
+        # IMPORTANT:
+        #
+        # We do not force a bias if the caller has not supplied
+        # one. This keeps score_candle usable independently.
+        #
+        # If bias IS supplied:
+        #
+        # bullish bias → BUY setups preferred
+        # bearish bias → SELL setups preferred
+        #
+        # Neutral → both directions remain possible.
+        #
+        # =====================================================
+
+        if bias is not None:
+
+            bias_text = str(
+                bias
+            ).lower()
+
+            if (
+                bias_text == "bullish"
+                and
+                bullish_candidate
+            ):
+
+                return {
+                    "signal": "BUY",
+                    "score": bullish_score,
+                    "reasons": bullish_reasons
+                }
+
+            if (
+                bias_text == "bearish"
+                and
+                bearish_candidate
+            ):
+
+                return {
+                    "signal": "SELL",
+                    "score": bearish_score,
+                    "reasons": bearish_reasons
+                }
+
+            # -------------------------------------------------
+            # If the setup conflicts with structure, WAIT.
+            # -------------------------------------------------
+
+            return {
+                "signal": "WAIT",
+                "score": max(
+                    bullish_score,
+                    bearish_score
+                ),
+                "reasons": (
+                    bullish_reasons
+                    +
+                    bearish_reasons
+                )
+            }
+
+        # =====================================================
+        # NO STRUCTURAL FILTER SUPPLIED
+        # =====================================================
+
+        if bullish_candidate:
 
             return {
                 "signal": "BUY",
@@ -239,11 +478,7 @@ class AureusStrategy:
                 "reasons": bullish_reasons
             }
 
-        if (
-            bearish_score >= self.minimum_score
-            and
-            bearish_score > bullish_score
-        ):
+        if bearish_candidate:
 
             return {
                 "signal": "SELL",
@@ -271,14 +506,23 @@ class AureusStrategy:
     def generate_signal(
         self,
         df,
-        index
+        index,
+        bias=None
     ):
+
+        if index < 0 or index >= len(df):
+
+            raise IndexError(
+                "Signal index is outside the "
+                "available dataframe."
+            )
 
         row = df.iloc[index]
 
-        result = self.score_candle(row)
-
-        return result
+        return self.score_candle(
+            row,
+            bias=bias
+        )
 
     # =========================================================
     # COMPLETE ANALYSIS
@@ -286,21 +530,58 @@ class AureusStrategy:
 
     def analyze(self, df):
 
-        df, bias = self.prepare(df)
+        df, bias = self.prepare(
+            df
+        )
 
         signals = []
+        scores = []
+        reasons = []
 
-        for i in range(len(df)):
+        # -----------------------------------------------------
+        # Generate signal for every available candle.
+        #
+        # NOTE:
+        # The individual analyzers must not use future data.
+        # We will audit that separately in their files.
+        # -----------------------------------------------------
+
+        for i in range(
+            len(df)
+        ):
 
             signal = self.generate_signal(
                 df,
-                i
+                i,
+                bias=bias
             )
 
             signals.append(
                 signal["signal"]
             )
 
+            scores.append(
+                signal["score"]
+            )
+
+            reasons.append(
+                signal["reasons"]
+            )
+
+        # -----------------------------------------------------
+        # Store strategy outputs
+        # -----------------------------------------------------
+
         df["aureus_signal"] = signals
+
+        df["aureus_score"] = scores
+
+        df["aureus_reasons"] = reasons
+
+        # -----------------------------------------------------
+        # Store structural bias
+        # -----------------------------------------------------
+
+        df["aureus_bias"] = bias
 
         return df, bias
