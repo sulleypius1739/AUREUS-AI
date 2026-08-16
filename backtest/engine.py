@@ -20,7 +20,6 @@ class BacktestEngine:
         self.risk_percent = risk_percent
         self.minimum_rr = minimum_rr
 
-        # The actual AUREUS technical strategy
         self.strategy = AureusStrategy(
             minimum_score=minimum_score,
             risk_percent=risk_percent,
@@ -42,7 +41,6 @@ class BacktestEngine:
 
         df = df.copy()
 
-        # Make column names consistent
         df.columns = [
             str(column).lower().strip()
             for column in df.columns
@@ -68,7 +66,6 @@ class BacktestEngine:
                 + str(missing)
             )
 
-        # Run the complete AUREUS technical analysis
         df, bias = self.strategy.prepare(df)
 
         return df, bias
@@ -76,32 +73,33 @@ class BacktestEngine:
     # =========================================================
     # EXECUTE TRADE
     # =========================================================
+    #
+    # ENTRY TIMING FIX
+    # ----------------
+    # The signal is generated using information available at
+    # the CLOSE of `signal_index`. To avoid unrealistic
+    # same-candle decide-and-execute behaviour, the trade is
+    # filled at the OPEN of `entry_index` (signal_index + 1),
+    # not at signal_index's own close.
+    #
+    # The structural stop is calculated using data known as of
+    # `signal_index`'s close — never data from `entry_index`,
+    # since that candle hasn't happened yet at decision time.
+    # =========================================================
 
     def open_trade(
         self,
         df,
-        index,
+        signal_index,
+        entry_index,
         signal
     ):
 
         entry = float(
-            df.iloc[index]["close"]
+            df.iloc[entry_index]["open"]
         )
 
         direction = signal["signal"]
-
-        # -----------------------------------------------------
-        # STOP LOSS
-        # -----------------------------------------------------
-        #
-        # Structural stop: nearest order block in the trade
-        # direction, falling back to the nearest swing point,
-        # falling back to the current candle's own low/high
-        # only if nothing structural is found nearby.
-        #
-        # See RiskManager.find_structural_stop() for the full
-        # search logic.
-        # -----------------------------------------------------
 
         if direction == "BUY":
 
@@ -117,23 +115,15 @@ class BacktestEngine:
 
         stop = self.risk.find_structural_stop(
             df,
-            index,
+            signal_index,
             trade_direction
         )
-
-        # -----------------------------------------------------
-        # TAKE PROFIT
-        # -----------------------------------------------------
 
         target = self.risk.calculate_target(
             entry,
             stop,
             trade_direction
         )
-
-        # -----------------------------------------------------
-        # VALIDATE RISK/REWARD
-        # -----------------------------------------------------
 
         valid = self.risk.validate_trade(
             entry,
@@ -146,10 +136,6 @@ class BacktestEngine:
 
             return None
 
-        # -----------------------------------------------------
-        # POSITION SIZE
-        # -----------------------------------------------------
-
         position_size = (
             self.risk.calculate_position_size(
                 self.balance,
@@ -160,7 +146,9 @@ class BacktestEngine:
 
         trade = {
 
-            "entry_index": index,
+            "signal_index": signal_index,
+
+            "entry_index": entry_index,
 
             "direction": direction,
 
@@ -206,9 +194,11 @@ class BacktestEngine:
 
                 continue
 
-            # =================================================
-            # BUY
-            # =================================================
+            # A trade can't be checked against a candle before
+            # it was actually filled.
+            if current_index < trade["entry_index"]:
+
+                continue
 
             if trade["direction"] == "BUY":
 
@@ -224,9 +214,6 @@ class BacktestEngine:
                     trade["target"]
                 )
 
-                # Conservative assumption:
-                # If both happen within the same candle,
-                # assume the stop was hit first.
                 if stop_hit:
 
                     trade["result"] = "LOSS"
@@ -242,10 +229,6 @@ class BacktestEngine:
                     trade["profit_R"] = self.minimum_rr
 
                     trade["exit_index"] = current_index
-
-            # =================================================
-            # SELL
-            # =================================================
 
             elif trade["direction"] == "SELL":
 
@@ -298,29 +281,15 @@ class BacktestEngine:
 
         print()
 
-        # -----------------------------------------------------
-        # WALK FORWARD THROUGH HISTORY
-        # -----------------------------------------------------
-        #
-        # This is important:
-        #
-        # The strategy only gets information available at
-        # each candle.
-        #
-        # We don't intentionally look into the future when
-        # making the trading decision.
-        # -----------------------------------------------------
+        length = len(df)
 
-        for i in range(len(df)):
+        for i in range(length):
 
-            # First manage existing positions
             self.check_open_trades(
                 df,
                 i
             )
 
-            # Don't open another trade if there is already
-            # an open position.
             open_position = any(
                 trade["result"] == "OPEN"
                 for trade in self.trades
@@ -330,27 +299,25 @@ class BacktestEngine:
 
                 continue
 
-            # Generate AUREUS signal
+            if i + 1 >= length:
+
+                continue
+
             signal = self.strategy.generate_signal(
                 df,
                 i
             )
 
-            # Only trade BUY or SELL
             if signal["signal"] == "WAIT":
 
                 continue
 
-            # Open trade
             self.open_trade(
                 df,
                 i,
+                i + 1,
                 signal
             )
-
-        # -----------------------------------------------------
-        # CLOSE REMAINING POSITIONS
-        # -----------------------------------------------------
 
         for trade in self.trades:
 
@@ -358,6 +325,6 @@ class BacktestEngine:
 
                 trade["result"] = "OPEN_AT_END"
 
-                trade["exit_index"] = len(df) - 1
+                trade["exit_index"] = length - 1
 
         return self.trades, df, bias
