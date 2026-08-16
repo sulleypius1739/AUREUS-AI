@@ -1,360 +1,201 @@
 class RiskManager:
-    """
-    AUREUS risk management.
-
-    Responsible for:
-
-        - Risk per trade
-        - Stop-loss validation
-        - Risk/reward validation
-        - Position sizing
-        - Take-profit calculation
-
-    IMPORTANT
-    ---------
-
-    This class does NOT decide whether a trade should exist.
-
-    The strategy decides the signal.
-
-    The backtest engine decides when the trade is executed.
-    """
 
     def __init__(
         self,
         risk_percent=1.0,
         minimum_rr=2.0,
-        max_risk_percent=2.0,
-        pip_size=0.0001
+        stop_buffer_atr=0.15,
+        atr_lookback=14,
+        structural_lookback=20
     ):
 
-        self.risk_percent = float(
-            risk_percent
-        )
-
-        self.minimum_rr = float(
-            minimum_rr
-        )
-
-        self.max_risk_percent = float(
-            max_risk_percent
-        )
-
-        self.pip_size = float(
-            pip_size
-        )
-
-        # -----------------------------------------------------
-        # Safety checks
-        # -----------------------------------------------------
-
-        if self.risk_percent <= 0:
-
-            raise ValueError(
-                "risk_percent must be greater than 0."
-            )
-
-        if self.risk_percent > self.max_risk_percent:
-
-            raise ValueError(
-                "risk_percent exceeds the configured maximum."
-            )
-
-        if self.minimum_rr <= 0:
-
-            raise ValueError(
-                "minimum_rr must be greater than 0."
-            )
-
-        if self.pip_size <= 0:
-
-            raise ValueError(
-                "pip_size must be greater than 0."
-            )
-
-    # =========================================================
-    # RISK AMOUNT
-    # =========================================================
-
-    def calculate_risk_amount(
-        self,
-        balance
-    ):
-        """
-        Calculate how much account currency can be lost
-        if the stop-loss is hit.
-
-        Example:
-
-            balance = 10,000
-            risk = 1%
-
-            risk amount = 100
-        """
-
-        balance = float(
-            balance
-        )
-
-        if balance <= 0:
-
-            return 0.0
-
-        return (
-            balance
-            *
-            self.risk_percent
-            /
-            100.0
-        )
-
-    # =========================================================
-    # STOP DISTANCE
-    # =========================================================
-
-    def calculate_stop_distance(
-        self,
-        entry,
-        stop
-    ):
-
-        return abs(
-            float(entry)
-            -
-            float(stop)
-        )
-
-    # =========================================================
-    # STOP DISTANCE IN PIPS
-    # =========================================================
-
-    def calculate_stop_pips(
-        self,
-        entry,
-        stop
-    ):
-        """
-        Convert price distance into pips.
-
-        EURUSD example:
-
-            Entry = 1.1000
-            Stop  = 1.0950
-
-            Distance = 0.0050
-
-            Pips = 50
-        """
-
-        distance = self.calculate_stop_distance(
-            entry,
-            stop
-        )
-
-        if distance <= 0:
-
-            return 0.0
-
-        return (
-            distance
-            /
-            self.pip_size
-        )
-
-    # =========================================================
-    # POSITION SIZE
-    # =========================================================
+        self.risk_percent = risk_percent
+        self.minimum_rr = minimum_rr
+        self.stop_buffer_atr = stop_buffer_atr
+        self.atr_lookback = atr_lookback
+        self.structural_lookback = structural_lookback
 
     def calculate_position_size(
         self,
         balance,
         entry,
-        stop,
-        pip_value_per_unit=0.0001
+        stop
     ):
-        """
-        Calculate position size using fixed percentage risk.
 
-        The formula is:
-
-            position size =
-                money risk
-                /
-                price risk per unit
-
-        For a more complete broker-specific implementation,
-        pip_value_per_unit can be adjusted to match the
-        instrument/account currency.
-
-        The default is intentionally conservative for the
-        internal backtester.
-        """
-
-        balance = float(
+        risk_amount = (
             balance
-        )
-
-        entry = float(
-            entry
-        )
-
-        stop = float(
-            stop
-        )
-
-        pip_value_per_unit = float(
-            pip_value_per_unit
-        )
-
-        risk_amount = self.calculate_risk_amount(
-            balance
-        )
-
-        stop_pips = self.calculate_stop_pips(
-            entry,
-            stop
-        )
-
-        if risk_amount <= 0:
-
-            return 0.0
-
-        if stop_pips <= 0:
-
-            return 0.0
-
-        if pip_value_per_unit <= 0:
-
-            return 0.0
-
-        position_size = (
-            risk_amount
+            *
+            self.risk_percent
             /
-            (
-                stop_pips
-                *
-                pip_value_per_unit
-            )
+            100
         )
 
-        return position_size
+        distance = abs(entry - stop)
+
+        if distance == 0:
+            return 0
+
+        return risk_amount / distance
 
     # =========================================================
-    # TAKE PROFIT
+    # ATR
     # =========================================================
+    #
+    # Average true range over the lookback window, using only
+    # candles up to and including `index`. No look-ahead.
+    # =========================================================
+
+    def calculate_atr(
+        self,
+        df,
+        index,
+        lookback=None
+    ):
+
+        lookback = lookback or self.atr_lookback
+
+        start = max(1, index - lookback + 1)
+
+        if start >= index + 1:
+            return None
+
+        highs = df["high"].to_numpy()
+        lows = df["low"].to_numpy()
+        closes = df["close"].to_numpy()
+
+        true_ranges = []
+
+        for i in range(start, index + 1):
+
+            tr = max(
+                highs[i] - lows[i],
+                abs(highs[i] - closes[i - 1]),
+                abs(lows[i] - closes[i - 1])
+            )
+
+            true_ranges.append(tr)
+
+        if not true_ranges:
+            return None
+
+        return sum(true_ranges) / len(true_ranges)
+
+    # =========================================================
+    # STRUCTURAL STOP LOSS
+    # =========================================================
+    #
+    # Looks backward from `index` for the most recent order
+    # block in the trade direction. Falls back to the most
+    # recent swing low/high. Falls back to the current
+    # candle's own low/high only if nothing structural exists
+    # within the lookback window.
+    #
+    # Mirrors the logic in riskEngine.js so both systems place
+    # stops the same way.
+    # =========================================================
+
+    def find_structural_stop(
+        self,
+        df,
+        index,
+        direction,
+        lookback=None
+    ):
+
+        lookback = lookback or self.structural_lookback
+
+        atr = self.calculate_atr(df, index)
+
+        buffer = (
+            atr * self.stop_buffer_atr
+            if atr
+            else 0
+        )
+
+        start = max(0, index - lookback)
+
+        if direction == "bullish":
+
+            ob_column = "bullish_order_block"
+            swing_column = "swing_low"
+            price_column = "low"
+
+        elif direction == "bearish":
+
+            ob_column = "bearish_order_block"
+            swing_column = "swing_high"
+            price_column = "high"
+
+        else:
+
+            return float(df.iloc[index]["low"])
+
+        # -----------------------------------------------------
+        # 1. Most recent order block within the lookback window
+        # -----------------------------------------------------
+
+        for i in range(index - 1, start - 1, -1):
+
+            if bool(df.iloc[i].get(ob_column, False)):
+
+                level = float(df.iloc[i][price_column])
+
+                return (
+                    level - buffer
+                    if direction == "bullish"
+                    else level + buffer
+                )
+
+        # -----------------------------------------------------
+        # 2. Most recent swing point within the lookback window
+        # -----------------------------------------------------
+
+        for i in range(index - 1, start - 1, -1):
+
+            if bool(df.iloc[i].get(swing_column, False)):
+
+                level = float(df.iloc[i][price_column])
+
+                return (
+                    level - buffer
+                    if direction == "bullish"
+                    else level + buffer
+                )
+
+        # -----------------------------------------------------
+        # 3. Fallback — current candle's own low/high
+        # -----------------------------------------------------
+
+        level = float(df.iloc[index][price_column])
+
+        return (
+            level - buffer
+            if direction == "bullish"
+            else level + buffer
+        )
 
     def calculate_target(
         self,
         entry,
         stop,
-        direction,
-        rr=None
+        direction
     ):
-        """
-        Calculate take-profit from risk/reward.
 
-        BUY:
-
-            target = entry + risk * RR
-
-        SELL:
-
-            target = entry - risk * RR
-        """
-
-        entry = float(
-            entry
-        )
-
-        stop = float(
-            stop
-        )
-
-        risk = abs(
-            entry - stop
-        )
-
-        if risk <= 0:
-
-            return None
-
-        if rr is None:
-
-            rr = self.minimum_rr
-
-        rr = float(
-            rr
-        )
-
-        if rr <= 0:
-
-            return None
+        risk = abs(entry - stop)
 
         reward = (
-            risk
-            *
-            rr
+            risk * self.minimum_rr
         )
 
-        direction = str(
-            direction
-        ).upper()
-
-        if direction in (
-            "BUY",
-            "BULLISH"
-        ):
+        if direction == "bullish":
 
             return entry + reward
 
-        if direction in (
-            "SELL",
-            "BEARISH"
-        ):
+        if direction == "bearish":
 
             return entry - reward
 
         return None
-
-    # =========================================================
-    # CALCULATE RR
-    # =========================================================
-
-    def calculate_rr(
-        self,
-        entry,
-        stop,
-        target
-    ):
-        """
-        Calculate actual reward/risk ratio.
-        """
-
-        risk = abs(
-            float(entry)
-            -
-            float(stop)
-        )
-
-        reward = abs(
-            float(target)
-            -
-            float(entry)
-        )
-
-        if risk <= 0:
-
-            return 0.0
-
-        return (
-            reward
-            /
-            risk
-        )
-
-    # =========================================================
-    # VALIDATE TRADE
-    # =========================================================
 
     def validate_trade(
         self,
@@ -363,119 +204,36 @@ class RiskManager:
         target,
         direction
     ):
-        """
-        Confirm that the trade has:
 
-            1. Valid entry
-            2. Valid stop
-            3. Valid target
-            4. Correct direction
-            5. Minimum RR
-        """
+        risk = abs(entry - stop)
 
-        try:
+        reward = abs(target - entry)
 
-            entry = float(
-                entry
-            )
-
-            stop = float(
-                stop
-            )
-
-            target = float(
-                target
-            )
-
-        except (
-            TypeError,
-            ValueError
-        ):
-
+        if risk == 0:
             return False
 
-        direction = str(
-            direction
-        ).upper()
+        rr = reward / risk
 
-        # -----------------------------------------------------
-        # No invalid numbers
-        # -----------------------------------------------------
-
-        if not all(
-            map(
-                lambda x: x == x,
-                [
-                    entry,
-                    stop,
-                    target
-                ]
-            )
-        ):
-
+        if rr < self.minimum_rr:
             return False
 
-        # -----------------------------------------------------
-        # Risk must exist
-        # -----------------------------------------------------
-
-        risk = abs(
-            entry - stop
-        )
-
-        if risk <= 0:
-
-            return False
-
-        # -----------------------------------------------------
-        # BUY
-        # -----------------------------------------------------
-
-        if direction in (
-            "BUY",
-            "BULLISH"
-        ):
+        if direction == "bullish":
 
             if stop >= entry:
-
                 return False
 
             if target <= entry:
-
                 return False
 
-        # -----------------------------------------------------
-        # SELL
-        # -----------------------------------------------------
-
-        elif direction in (
-            "SELL",
-            "BEARISH"
-        ):
+        elif direction == "bearish":
 
             if stop <= entry:
-
                 return False
 
             if target >= entry:
-
                 return False
 
         else:
-
-            return False
-
-        # -----------------------------------------------------
-        # RR
-        # -----------------------------------------------------
-
-        rr = self.calculate_rr(
-            entry,
-            stop,
-            target
-        )
-
-        if rr < self.minimum_rr:
 
             return False
 
