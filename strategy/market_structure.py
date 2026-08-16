@@ -2,198 +2,322 @@ import pandas as pd
 import numpy as np
 
 
-class MarketStructure:
+class LiquidityAnalyzer:
 
-    def __init__(self, swing_length=3):
-        self.swing_length = swing_length
+    def __init__(
+        self,
+        swing_lookback=3,
+        equal_tolerance=0.0002
+    ):
+
+        self.swing_lookback = swing_lookback
+        self.equal_tolerance = equal_tolerance
 
     # =========================================================
-    # DETECT SWING HIGHS / LOWS
-    # =========================================================
-    #
-    # CAUSALITY
-    # ---------
-    # A swing high/low at index i can only be confirmed once
-    # `swing_length` candles AFTER i exist. We store TWO sets
-    # of columns:
-    #
-    #   swing_high / swing_low
-    #       True at the ANCHOR index (event time) — the actual
-    #       candle that turned out to be the swing. Useful for
-    #       labeling/plotting only. NEVER usable for a live
-    #       trading decision at that index — it wasn't
-    #       knowable yet.
-    #
-    #   swing_high_confirmed / swing_low_confirmed
-    #       True at the CONFIRMATION index (i + swing_length) —
-    #       the earliest point this swing is actually knowable.
-    #       This is what all downstream causal logic must use.
-    #
-    #   swing_high_price / swing_low_price
-    #       The swing's price, stored at the CONFIRMATION index.
+    # PREPARE COLUMNS
     # =========================================================
 
-    def detect_swings(self, df):
+    def add_columns(self, df):
 
         df = df.copy()
 
-        n = self.swing_length
-        length = len(df)
+        columns = [
+            "equal_high",
+            "equal_low",
+            "buy_side_liquidity",
+            "sell_side_liquidity",
+            "buy_side_sweep",
+            "sell_side_sweep"
+        ]
+
+        for column in columns:
+
+            if column not in df.columns:
+
+                df[column] = False
+
+        return df
+
+    # =========================================================
+    # EQUAL HIGHS
+    # =========================================================
+
+    def find_equal_highs(self, df):
+
+        df = df.copy()
 
         highs = df["high"].to_numpy()
-        lows = df["low"].to_numpy()
 
-        swing_high = np.zeros(length, dtype=bool)
-        swing_low = np.zeros(length, dtype=bool)
+        equal_high = np.zeros(
+            len(df),
+            dtype=bool
+        )
 
-        swing_high_confirmed = np.zeros(length, dtype=bool)
-        swing_low_confirmed = np.zeros(length, dtype=bool)
+        lookback = self.swing_lookback
 
-        swing_high_price = np.full(length, np.nan)
-        swing_low_price = np.full(length, np.nan)
+        tolerance = self.equal_tolerance
 
-        for i in range(n, length - n):
+        for i in range(lookback, len(df)):
 
             current_high = highs[i]
-            left_high = highs[i - n:i]
-            right_high = highs[i + 1:i + n + 1]
 
-            if (
-                current_high > left_high.max()
-                and current_high > right_high.max()
+            previous_highs = highs[
+                i - lookback:i
+            ]
+
+            difference = np.abs(
+                previous_highs
+                -
+                current_high
+            )
+
+            relative_difference = (
+                difference
+                /
+                np.maximum(
+                    np.abs(current_high),
+                    1e-12
+                )
+            )
+
+            if np.any(
+                relative_difference
+                <=
+                tolerance
             ):
-                swing_high[i] = True
-                confirm_index = i + n
-                if confirm_index < length:
-                    swing_high_confirmed[confirm_index] = True
-                    swing_high_price[confirm_index] = current_high
 
-            current_low = lows[i]
-            left_low = lows[i - n:i]
-            right_low = lows[i + 1:i + n + 1]
+                equal_high[i] = True
 
-            if (
-                current_low < left_low.min()
-                and current_low < right_low.min()
-            ):
-                swing_low[i] = True
-                confirm_index = i + n
-                if confirm_index < length:
-                    swing_low_confirmed[confirm_index] = True
-                    swing_low_price[confirm_index] = current_low
-
-        df["swing_high"] = swing_high
-        df["swing_low"] = swing_low
-        df["swing_high_confirmed"] = swing_high_confirmed
-        df["swing_low_confirmed"] = swing_low_confirmed
-        df["swing_high_price"] = swing_high_price
-        df["swing_low_price"] = swing_low_price
+        df["equal_high"] = equal_high
 
         return df
 
     # =========================================================
-    # CLASSIFY SWING STRUCTURE
-    # =========================================================
-    #
-    # Uses ONLY the confirmed swing columns. The structure
-    # label at index i reflects what was actually knowable at
-    # index i — not what the anchor candle later turned out
-    # to represent.
+    # EQUAL LOWS
     # =========================================================
 
-    def classify_structure(self, df):
+    def find_equal_lows(self, df):
 
         df = df.copy()
-        length = len(df)
 
-        structure = np.full(length, None, dtype=object)
+        lows = df["low"].to_numpy()
 
-        swing_high_confirmed = df["swing_high_confirmed"].to_numpy()
-        swing_low_confirmed = df["swing_low_confirmed"].to_numpy()
-        swing_high_price = df["swing_high_price"].to_numpy()
-        swing_low_price = df["swing_low_price"].to_numpy()
+        equal_low = np.zeros(
+            len(df),
+            dtype=bool
+        )
 
-        previous_swing_high = None
-        previous_swing_low = None
+        lookback = self.swing_lookback
 
-        for i in range(length):
+        tolerance = self.equal_tolerance
 
-            if swing_high_confirmed[i]:
+        for i in range(lookback, len(df)):
 
-                current_high = swing_high_price[i]
+            current_low = lows[i]
 
-                if previous_swing_high is not None:
+            previous_lows = lows[
+                i - lookback:i
+            ]
 
-                    if current_high > previous_swing_high:
-                        structure[i] = "HH"
+            difference = np.abs(
+                previous_lows
+                -
+                current_low
+            )
 
-                    elif current_high < previous_swing_high:
-                        structure[i] = "LH"
+            relative_difference = (
+                difference
+                /
+                np.maximum(
+                    np.abs(current_low),
+                    1e-12
+                )
+            )
 
-                previous_swing_high = current_high
+            if np.any(
+                relative_difference
+                <=
+                tolerance
+            ):
 
-            if swing_low_confirmed[i]:
+                equal_low[i] = True
 
-                current_low = swing_low_price[i]
-
-                if previous_swing_low is not None:
-
-                    if current_low > previous_swing_low:
-                        structure[i] = "HL"
-
-                    elif current_low < previous_swing_low:
-                        structure[i] = "LL"
-
-                previous_swing_low = current_low
-
-        df["structure"] = structure
+        df["equal_low"] = equal_low
 
         return df
 
     # =========================================================
-    # DETERMINE BIAS
-    # =========================================================
-    #
-    # NOTE: this remains a single end-of-data summary bias,
-    # used only for the printed diagnostic line. It is NOT
-    # used per-candle for trade decisions in aureus_strategy.py
-    # today. A rolling, causal, per-candle bias is a genuine
-    # future improvement but is deliberately not implemented
-    # here — it's a scoring/architecture change, not a bug fix,
-    # and belongs in a separate pass.
+    # BUY-SIDE LIQUIDITY
     # =========================================================
 
-    def determine_bias(self, df):
+    def identify_buy_side_liquidity(
+        self,
+        df
+    ):
 
-        structure = df["structure"].dropna()
+        df = df.copy()
 
-        if len(structure) < 2:
-            return "neutral"
+        df["buy_side_liquidity"] = (
+            df["equal_high"]
+        )
 
-        recent_high = None
-        recent_low = None
+        return df
 
-        for value in reversed(structure.to_numpy()):
+    # =========================================================
+    # SELL-SIDE LIQUIDITY
+    # =========================================================
 
-            if recent_high is None and value in ["HH", "LH"]:
-                recent_high = value
+    def identify_sell_side_liquidity(
+        self,
+        df
+    ):
 
-            if recent_low is None and value in ["HL", "LL"]:
-                recent_low = value
+        df = df.copy()
 
-            if recent_high is not None and recent_low is not None:
-                break
+        df["sell_side_liquidity"] = (
+            df["equal_low"]
+        )
 
-        if recent_high == "HH" and recent_low == "HL":
-            return "bullish"
+        return df
 
-        if recent_high == "LH" and recent_low == "LL":
-            return "bearish"
+    # =========================================================
+    # BUY-SIDE LIQUIDITY SWEEP
+    # =========================================================
 
-        return "neutral"
+    def detect_buy_side_sweeps(
+        self,
+        df
+    ):
+
+        df = df.copy()
+
+        highs = df["high"].to_numpy()
+        closes = df["close"].to_numpy()
+
+        equal_highs = df[
+            "equal_high"
+        ].to_numpy()
+
+        sweeps = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        last_liquidity_high = None
+
+        for i in range(len(df)):
+
+            if equal_highs[i]:
+
+                last_liquidity_high = highs[i]
+
+            if (
+                last_liquidity_high
+                is not None
+            ):
+
+                if (
+                    highs[i]
+                    >
+                    last_liquidity_high
+                    and
+                    closes[i]
+                    
+                    last_liquidity_high
+                ):
+
+                    sweeps[i] = True
+
+                    last_liquidity_high = None
+
+        df[
+            "buy_side_sweep"
+        ] = sweeps
+
+        return df
+
+    # =========================================================
+    # SELL-SIDE LIQUIDITY SWEEP
+    # =========================================================
+
+    def detect_sell_side_sweeps(
+        self,
+        df
+    ):
+
+        df = df.copy()
+
+        lows = df["low"].to_numpy()
+        closes = df["close"].to_numpy()
+
+        equal_lows = df[
+            "equal_low"
+        ].to_numpy()
+
+        sweeps = np.zeros(
+            len(df),
+            dtype=bool
+        )
+
+        last_liquidity_low = None
+
+        for i in range(len(df)):
+
+            if equal_lows[i]:
+
+                last_liquidity_low = lows[i]
+
+            if (
+                last_liquidity_low
+                is not None
+            ):
+
+                if (
+                    lows[i]
+                    
+                    last_liquidity_low
+                    and
+                    closes[i]
+                    >
+                    last_liquidity_low
+                ):
+
+                    sweeps[i] = True
+
+                    last_liquidity_low = None
+
+        df[
+            "sell_side_sweep"
+        ] = sweeps
+
+        return df
+
+    # =========================================================
+    # COMPLETE LIQUIDITY ANALYSIS
+    # =========================================================
 
     def analyze(self, df):
-        df = self.detect_swings(df)
-        df = self.classify_structure(df)
-        bias = self.determine_bias(df)
-        return df, bias
+
+        df = self.add_columns(df)
+
+        df = self.find_equal_highs(df)
+
+        df = self.find_equal_lows(df)
+
+        df = self.identify_buy_side_liquidity(
+            df
+        )
+
+        df = self.identify_sell_side_liquidity(
+            df
+        )
+
+        df = self.detect_buy_side_sweeps(
+            df
+        )
+
+        df = self.detect_sell_side_sweeps(
+            df
+        )
+
+        return df
