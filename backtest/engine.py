@@ -1,9 +1,6 @@
 import pandas as pd
 
-from strategy.market_structure import MarketStructure
-from strategy.liquidity import LiquidityAnalyzer
-from strategy.zones import ZoneAnalyzer
-from strategy.confirmations import ConfirmationAnalyzer
+from strategy.aureus_strategy import AureusStrategy
 from strategy.risk_management import RiskManager
 
 
@@ -13,16 +10,22 @@ class BacktestEngine:
         self,
         starting_balance=10000,
         risk_percent=1.0,
-        minimum_rr=2.0
+        minimum_rr=2.0,
+        minimum_score=3
     ):
 
         self.starting_balance = starting_balance
         self.balance = starting_balance
 
-        self.market_structure = MarketStructure()
-        self.liquidity = LiquidityAnalyzer()
-        self.zones = ZoneAnalyzer()
-        self.confirmations = ConfirmationAnalyzer()
+        self.risk_percent = risk_percent
+        self.minimum_rr = minimum_rr
+
+        # The actual AUREUS technical strategy
+        self.strategy = AureusStrategy(
+            minimum_score=minimum_score,
+            risk_percent=risk_percent,
+            minimum_rr=minimum_rr
+        )
 
         self.risk = RiskManager(
             risk_percent=risk_percent,
@@ -37,6 +40,14 @@ class BacktestEngine:
 
     def prepare_data(self, df):
 
+        df = df.copy()
+
+        # Make column names consistent
+        df.columns = [
+            str(column).lower().strip()
+            for column in df.columns
+        ]
+
         required = [
             "open",
             "high",
@@ -44,278 +55,102 @@ class BacktestEngine:
             "close"
         ]
 
-        for column in required:
-
-            if column not in df.columns:
-
-                raise ValueError(
-                    f"Missing required column: {column}"
-                )
-
-        df = df.copy()
-
-        df.columns = [
-            str(column).lower().strip()
-            for column in df.columns
+        missing = [
+            column
+            for column in required
+            if column not in df.columns
         ]
 
-        # Market structure
-        df, bias = self.market_structure.analyze(df)
+        if missing:
 
-        # Liquidity
-        df = self.liquidity.analyze(df)
+            raise ValueError(
+                "Missing required columns: "
+                + str(missing)
+            )
 
-        # Zones
-        df = self.zones.analyze(df)
-
-        # Candlestick confirmations
-        df = self.confirmations.analyze(df)
+        # Run the complete AUREUS technical analysis
+        df, bias = self.strategy.prepare(df)
 
         return df, bias
-
-    # =========================================================
-    # DETERMINE SIGNAL
-    # =========================================================
-
-    def get_signal(self, row):
-
-        bullish_score = 0
-        bearish_score = 0
-
-        reasons = []
-
-        # -----------------------------------------------------
-        # BULLISH LIQUIDITY SWEEP
-        # -----------------------------------------------------
-
-        if row.get("sell_side_sweep", False):
-
-            bullish_score += 2
-
-            reasons.append(
-                "Sell-side liquidity sweep"
-            )
-
-        # -----------------------------------------------------
-        # BEARISH LIQUIDITY SWEEP
-        # -----------------------------------------------------
-
-        if row.get("buy_side_sweep", False):
-
-            bearish_score += 2
-
-            reasons.append(
-                "Buy-side liquidity sweep"
-            )
-
-        # -----------------------------------------------------
-        # BULLISH ORDER BLOCK
-        # -----------------------------------------------------
-
-        if row.get(
-            "bullish_order_block",
-            False
-        ):
-
-            bullish_score += 1
-
-            reasons.append(
-                "Bullish order block"
-            )
-
-        # -----------------------------------------------------
-        # BEARISH ORDER BLOCK
-        # -----------------------------------------------------
-
-        if row.get(
-            "bearish_order_block",
-            False
-        ):
-
-            bearish_score += 1
-
-            reasons.append(
-                "Bearish order block"
-            )
-
-        # -----------------------------------------------------
-        # BULLISH FVG
-        # -----------------------------------------------------
-
-        if row.get(
-            "bullish_fvg",
-            False
-        ):
-
-            bullish_score += 1
-
-            reasons.append(
-                "Bullish FVG"
-            )
-
-        # -----------------------------------------------------
-        # BEARISH FVG
-        # -----------------------------------------------------
-
-        if row.get(
-            "bearish_fvg",
-            False
-        ):
-
-            bearish_score += 1
-
-            reasons.append(
-                "Bearish FVG"
-            )
-
-        # -----------------------------------------------------
-        # BULLISH ENGULFING
-        # -----------------------------------------------------
-
-        if row.get(
-            "bullish_engulfing",
-            False
-        ):
-
-            bullish_score += 1
-
-            reasons.append(
-                "Bullish engulfing"
-            )
-
-        # -----------------------------------------------------
-        # BEARISH ENGULFING
-        # -----------------------------------------------------
-
-        if row.get(
-            "bearish_engulfing",
-            False
-        ):
-
-            bearish_score += 1
-
-            reasons.append(
-                "Bearish engulfing"
-            )
-
-        # -----------------------------------------------------
-        # BULLISH REJECTION
-        # -----------------------------------------------------
-
-        if row.get(
-            "bullish_rejection",
-            False
-        ):
-
-            bullish_score += 1
-
-            reasons.append(
-                "Bullish rejection"
-            )
-
-        # -----------------------------------------------------
-        # BEARISH REJECTION
-        # -----------------------------------------------------
-
-        if row.get(
-            "bearish_rejection",
-            False
-        ):
-
-            bearish_score += 1
-
-            reasons.append(
-                "Bearish rejection"
-            )
-
-        # -----------------------------------------------------
-        # FINAL SIGNAL
-        # -----------------------------------------------------
-
-        if (
-            bullish_score >= 3
-            and
-            bullish_score > bearish_score
-        ):
-
-            return {
-                "signal": "BUY",
-                "score": bullish_score,
-                "reasons": reasons
-            }
-
-        if (
-            bearish_score >= 3
-            and
-            bearish_score > bullish_score
-        ):
-
-            return {
-                "signal": "SELL",
-                "score": bearish_score,
-                "reasons": reasons
-            }
-
-        return {
-            "signal": "WAIT",
-            "score": max(
-                bullish_score,
-                bearish_score
-            ),
-            "reasons": reasons
-        }
 
     # =========================================================
     # EXECUTE TRADE
     # =========================================================
 
-    def execute_trade(
+    def open_trade(
         self,
         df,
         index,
         signal
     ):
 
-        entry = df.iloc[index]["close"]
+        entry = float(
+            df.iloc[index]["close"]
+        )
 
         direction = signal["signal"]
 
         # -----------------------------------------------------
-        # INITIAL STOP
+        # STOP LOSS
+        # -----------------------------------------------------
+        #
+        # Initial version:
+        #
+        # BUY  → below current candle low
+        # SELL → above current candle high
+        #
+        # Later we will improve this to use protected
+        # swing highs/lows and liquidity structure.
         # -----------------------------------------------------
 
         if direction == "BUY":
 
-            stop = df.iloc[index]["low"]
+            stop = float(
+                df.iloc[index]["low"]
+            )
+
+            trade_direction = "bullish"
+
+        elif direction == "SELL":
+
+            stop = float(
+                df.iloc[index]["high"]
+            )
+
+            trade_direction = "bearish"
 
         else:
 
-            stop = df.iloc[index]["high"]
+            return None
 
         # -----------------------------------------------------
-        # TARGET
+        # TAKE PROFIT
         # -----------------------------------------------------
 
         target = self.risk.calculate_target(
             entry,
             stop,
-            "bullish"
-            if direction == "BUY"
-            else "bearish"
+            trade_direction
         )
+
+        # -----------------------------------------------------
+        # VALIDATE RISK/REWARD
+        # -----------------------------------------------------
 
         valid = self.risk.validate_trade(
             entry,
             stop,
             target,
-            "bullish"
-            if direction == "BUY"
-            else "bearish"
+            trade_direction
         )
 
         if not valid:
 
-            return
+            return None
+
+        # -----------------------------------------------------
+        # POSITION SIZE
+        # -----------------------------------------------------
 
         position_size = (
             self.risk.calculate_position_size(
@@ -345,17 +180,21 @@ class BacktestEngine:
 
             "result": "OPEN",
 
-            "profit": 0
+            "profit_R": 0,
+
+            "exit_index": None
 
         }
 
         self.trades.append(trade)
 
+        return trade
+
     # =========================================================
     # CHECK OPEN TRADES
     # =========================================================
 
-    def check_trade_result(
+    def check_open_trades(
         self,
         df,
         current_index
@@ -369,35 +208,76 @@ class BacktestEngine:
 
                 continue
 
+            # =================================================
             # BUY
+            # =================================================
+
             if trade["direction"] == "BUY":
 
-                if current["low"] <= trade["stop"]:
+                stop_hit = (
+                    current["low"]
+                    <=
+                    trade["stop"]
+                )
+
+                target_hit = (
+                    current["high"]
+                    >=
+                    trade["target"]
+                )
+
+                # Conservative assumption:
+                # If both happen within the same candle,
+                # assume the stop was hit first.
+                if stop_hit:
 
                     trade["result"] = "LOSS"
 
-                    trade["profit"] = -1
+                    trade["profit_R"] = -1
 
-                elif current["high"] >= trade["target"]:
+                    trade["exit_index"] = current_index
+
+                elif target_hit:
 
                     trade["result"] = "WIN"
 
-                    trade["profit"] = 1
+                    trade["profit_R"] = self.minimum_rr
 
+                    trade["exit_index"] = current_index
+
+            # =================================================
             # SELL
+            # =================================================
+
             elif trade["direction"] == "SELL":
 
-                if current["high"] >= trade["stop"]:
+                stop_hit = (
+                    current["high"]
+                    >=
+                    trade["stop"]
+                )
+
+                target_hit = (
+                    current["low"]
+                    <=
+                    trade["target"]
+                )
+
+                if stop_hit:
 
                     trade["result"] = "LOSS"
 
-                    trade["profit"] = -1
+                    trade["profit_R"] = -1
 
-                elif current["low"] <= trade["target"]:
+                    trade["exit_index"] = current_index
+
+                elif target_hit:
 
                     trade["result"] = "WIN"
 
-                    trade["profit"] = 1
+                    trade["profit_R"] = self.minimum_rr
+
+                    trade["exit_index"] = current_index
 
     # =========================================================
     # RUN BACKTEST
@@ -407,28 +287,79 @@ class BacktestEngine:
 
         df, bias = self.prepare_data(df)
 
+        print()
         print(
-            f"Detected overall bias: {bias}"
+            "AUREUS structural bias:",
+            bias
         )
+
+        print(
+            "Candles analysed:",
+            len(df)
+        )
+
+        print()
+
+        # -----------------------------------------------------
+        # WALK FORWARD THROUGH HISTORY
+        # -----------------------------------------------------
+        #
+        # This is important:
+        #
+        # The strategy only gets information available at
+        # each candle.
+        #
+        # We don't intentionally look into the future when
+        # making the trading decision.
+        # -----------------------------------------------------
 
         for i in range(len(df)):
 
-            # Check existing trades first
-            self.check_trade_result(
+            # First manage existing positions
+            self.check_open_trades(
                 df,
                 i
             )
 
-            signal = self.get_signal(
-                df.iloc[i]
+            # Don't open another trade if there is already
+            # an open position.
+            open_position = any(
+                trade["result"] == "OPEN"
+                for trade in self.trades
             )
 
-            if signal["signal"] != "WAIT":
+            if open_position:
 
-                self.execute_trade(
-                    df,
-                    i,
-                    signal
-                )
+                continue
 
-        return self.trades
+            # Generate AUREUS signal
+            signal = self.strategy.generate_signal(
+                df,
+                i
+            )
+
+            # Only trade BUY or SELL
+            if signal["signal"] == "WAIT":
+
+                continue
+
+            # Open trade
+            self.open_trade(
+                df,
+                i,
+                signal
+            )
+
+        # -----------------------------------------------------
+        # CLOSE REMAINING POSITIONS
+        # -----------------------------------------------------
+
+        for trade in self.trades:
+
+            if trade["result"] == "OPEN":
+
+                trade["result"] = "OPEN_AT_END"
+
+                trade["exit_index"] = len(df) - 1
+
+        return self.trades, df, bias
