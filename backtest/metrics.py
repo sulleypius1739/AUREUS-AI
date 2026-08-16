@@ -1,48 +1,57 @@
 def calculate_metrics(trades):
 
-    if not trades:
+    closed_trades = [
+        trade
+        for trade in trades
+        if trade["result"] in ["WIN", "LOSS"]
+    ]
+
+    total = len(closed_trades)
+
+    if total == 0:
 
         return {
             "total_trades": 0,
             "wins": 0,
             "losses": 0,
             "win_rate": 0,
-            "profit_factor": 0
+            "profit_factor": 0,
+            "net_result_R": 0
         }
 
-    wins = 0
-    losses = 0
+    wins = sum(
+        1
+        for trade in closed_trades
+        if trade["result"] == "WIN"
+    )
 
-    gross_profit = 0
-    gross_loss = 0
+    losses = sum(
+        1
+        for trade in closed_trades
+        if trade["result"] == "LOSS"
+    )
 
-    for trade in trades:
+    gross_profit = wins
 
-        if trade["result"] == "WIN":
+    gross_loss = losses
 
-            wins += 1
-            gross_profit += trade.get("profit", 0)
+    if gross_loss == 0:
 
-        elif trade["result"] == "LOSS":
+        profit_factor = float("inf")
 
-            losses += 1
-            gross_loss += abs(
-                trade.get("profit", 0)
-            )
+    else:
 
-    total = wins + losses
+        profit_factor = (
+            gross_profit / gross_loss
+        )
+
+    net_result = (
+        wins - losses
+    )
 
     win_rate = (
-        wins / total * 100
-        if total > 0
-        else 0
-    )
-
-    profit_factor = (
-        gross_profit / gross_loss
-        if gross_loss > 0
-        else 0
-    )
+        wins / total
+    ) * 100
 
     return {
 
@@ -61,5 +70,8 @@ def calculate_metrics(trades):
             profit_factor,
             2
         )
+        if profit_factor != float("inf")
+        else "INF",
 
+        "net_result_R": net_result
     }
