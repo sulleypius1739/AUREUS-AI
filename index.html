@@ -1,11 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Aureus AI</title>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>AUREUS AI — Intelligent Market Analysis</title>
+
+    <!-- Lightweight Charts -->
+    <script
+        src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js">
+    </script>
 
     <style>
 
@@ -15,544 +24,1233 @@
             padding: 0;
         }
 
-        body {
-            font-family: Arial, Helvetica, sans-serif;
-            background: #0b0f14;
-            color: #e8edf3;
-            min-height: 100vh;
+        :root {
+
+            --bg: #070a0f;
+            --panel: #0d121a;
+            --panel2: #111824;
+            --border: #1d2633;
+
+            --text: #edf2f7;
+            --muted: #7f8b9b;
+
+            --green: #00d69f;
+            --red: #ff4f68;
+            --yellow: #f4c95d;
+            --blue: #5c8dff;
+            --purple: #a978ff;
+
         }
+
+        body {
+
+            font-family:
+                Inter,
+                Arial,
+                sans-serif;
+
+            background:
+                radial-gradient(
+                    circle at top right,
+                    #111c2d 0,
+                    var(--bg) 35%
+                );
+
+            color: var(--text);
+
+            min-height: 100vh;
+
+        }
+
+        button,
+        input,
+        select {
+
+            font: inherit;
+
+        }
+
+        button {
+
+            cursor: pointer;
+
+        }
+
+        /* =========================================
+           APP LAYOUT
+        ========================================= */
 
         .app {
+
             display: flex;
+
             min-height: 100vh;
+
         }
 
 
-        /* =========================
+        /* =========================================
            SIDEBAR
-        ========================= */
+        ========================================= */
 
         .sidebar {
-            width: 240px;
-            background: #0f141b;
-            border-right: 1px solid #202832;
-            padding: 24px 16px;
+
+            width: 250px;
+
+            background:
+                rgba(9,13,20,.96);
+
+            border-right:
+                1px solid var(--border);
+
+            padding: 22px 14px;
 
             position: fixed;
 
             top: 0;
             bottom: 0;
             left: 0;
+
+            z-index: 20;
+
         }
 
-        .logo {
-            font-size: 24px;
-            font-weight: bold;
 
-            letter-spacing: 1px;
+        .brand {
 
-            margin-bottom: 8px;
+            padding:
+                5px 12px 28px;
+
         }
 
-        .logo span {
-            color: #d6a84f;
+        .brand h1 {
+
+            font-size: 22px;
+
+            letter-spacing: 4px;
+
+            font-weight: 800;
+
         }
 
-        .subtitle {
-            color: #788494;
+        .brand span {
 
-            font-size: 11px;
+            color: var(--green);
 
-            margin-bottom: 35px;
-
-            letter-spacing: 1.5px;
         }
 
-        .nav-title {
-            color: #596575;
+        .brand p {
+
+            color: var(--muted);
 
             font-size: 10px;
 
-            text-transform: uppercase;
+            letter-spacing: 2px;
+
+            margin-top: 5px;
+
+        }
+
+
+        .nav-title {
+
+            color: #4e5968;
+
+            font-size: 10px;
 
             letter-spacing: 1.5px;
 
-            margin: 20px 12px 8px;
+            margin:
+                18px 12px 7px;
+
         }
 
+
         .nav-item {
-            padding: 11px 12px;
 
-            border-radius: 7px;
+            display: flex;
 
-            color: #929dab;
+            align-items: center;
 
-            margin-bottom: 3px;
+            gap: 11px;
 
-            cursor: pointer;
+            width: 100%;
 
-            font-size: 14px;
+            padding:
+                11px 13px;
+
+            margin-bottom: 4px;
+
+            color: var(--muted);
+
+            background: transparent;
+
+            border: 0;
+
+            border-radius: 9px;
+
+            text-align: left;
+
+            transition: .2s;
+
         }
 
         .nav-item:hover {
-            background: #171e27;
+
+            background: #151d29;
+
             color: white;
+
         }
 
         .nav-item.active {
-            background: #1a222c;
 
-            color: #ffffff;
+            background:
+                linear-gradient(
+                    90deg,
+                    rgba(0,214,159,.14),
+                    transparent
+                );
 
-            border-left: 3px solid #d6a84f;
+            color: var(--green);
+
+            border-left:
+                2px solid var(--green);
+
+        }
+
+        .nav-icon {
+
+            width: 18px;
+
+            text-align: center;
+
         }
 
 
-        /* =========================
-           MAIN
-        ========================= */
+        .connection {
 
-        .main {
-            margin-left: 240px;
+            position: absolute;
 
-            width: calc(100% - 240px);
+            left: 14px;
+            right: 14px;
+            bottom: 18px;
 
-            padding: 24px 30px;
+            padding: 12px;
+
+            border:
+                1px solid var(--border);
+
+            background: #0b1017;
+
+            border-radius: 10px;
+
         }
 
-        .topbar {
-            display: flex;
+        .connection-dot {
 
-            justify-content: space-between;
-
-            align-items: center;
-
-            margin-bottom: 28px;
-        }
-
-        .page-title {
-            font-size: 26px;
-
-            font-weight: 600;
-        }
-
-        .page-description {
-            color: #737f8e;
-
-            font-size: 13px;
-
-            margin-top: 5px;
-        }
-
-
-        /* SYSTEM STATUS */
-
-        .system-status {
-            display: flex;
-
-            align-items: center;
-
-            gap: 8px;
-
-            background: #121920;
-
-            border: 1px solid #27313c;
-
-            padding: 9px 13px;
-
-            border-radius: 20px;
-
-            font-size: 12px;
-
-            color: #9ca8b6;
-        }
-
-        .status-dot {
             width: 8px;
             height: 8px;
 
-            background: #35c58a;
+            background: var(--yellow);
 
             border-radius: 50%;
 
-            box-shadow: 0 0 8px #35c58a;
+            display: inline-block;
+
+            margin-right: 6px;
+
+        }
+
+        .connection small {
+
+            color: var(--muted);
+
+            display: block;
+
+            margin-top: 5px;
+
+            font-size: 10px;
+
         }
 
 
-        /* =========================
-           MARKET SCANNER
-        ========================= */
+        /* =========================================
+           MAIN
+        ========================================= */
 
-        .section-title {
-            font-size: 14px;
+        .main {
 
-            color: #9aa5b3;
+            margin-left: 250px;
 
-            text-transform: uppercase;
+            width: calc(100% - 250px);
 
-            letter-spacing: 1.2px;
+            padding: 24px 28px 50px;
 
-            margin-bottom: 13px;
         }
 
-        .market-grid {
+
+        .topbar {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            margin-bottom: 26px;
+
+        }
+
+        .page-title h2 {
+
+            font-size: 25px;
+
+        }
+
+        .page-title p {
+
+            color: var(--muted);
+
+            margin-top: 5px;
+
+            font-size: 13px;
+
+        }
+
+
+        .top-actions {
+
+            display: flex;
+
+            gap: 9px;
+
+        }
+
+        .btn {
+
+            border:
+                1px solid var(--border);
+
+            background: var(--panel);
+
+            color: var(--text);
+
+            padding:
+                9px 14px;
+
+            border-radius: 8px;
+
+        }
+
+        .btn:hover {
+
+            border-color:
+                #344257;
+
+        }
+
+        .btn-primary {
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #00c992,
+                    #00a97d
+                );
+
+            color: #03120e;
+
+            border: none;
+
+            font-weight: 700;
+
+        }
+
+
+        /* =========================================
+           PAGES
+        ========================================= */
+
+        .page {
+
+            display: none;
+
+        }
+
+        .page.active {
+
+            display: block;
+
+        }
+
+
+        /* =========================================
+           DASHBOARD
+        ========================================= */
+
+        .hero {
+
+            padding: 25px;
+
+            border:
+                1px solid var(--border);
+
+            border-radius: 15px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(0,214,159,.08),
+                    rgba(92,141,255,.05)
+                );
+
+            margin-bottom: 18px;
+
+        }
+
+        .hero h3 {
+
+            font-size: 23px;
+
+            margin-bottom: 7px;
+
+        }
+
+        .hero p {
+
+            color: var(--muted);
+
+            max-width: 720px;
+
+            line-height: 1.6;
+
+        }
+
+
+        .stat-grid {
+
             display: grid;
 
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns:
+                repeat(4,1fr);
 
-            gap: 14px;
+            gap: 13px;
 
-            margin-bottom: 28px;
+            margin-bottom: 18px;
+
         }
 
-        .market-card {
-            background: #11171f;
+        .stat-card {
 
-            border: 1px solid #222c37;
+            background: var(--panel);
 
-            border-radius: 9px;
+            border:
+                1px solid var(--border);
 
             padding: 18px;
 
-            transition: 0.2s;
+            border-radius: 12px;
+
         }
 
-        .market-card:hover {
-            border-color: #d6a84f;
+        .stat-card .label {
 
-            transform: translateY(-2px);
-        }
-
-        .market-header {
-            display: flex;
-
-            justify-content: space-between;
-
-            margin-bottom: 17px;
-        }
-
-        .instrument {
-            font-size: 15px;
-
-            font-weight: bold;
-        }
-
-        .asset-type {
-            color: #687585;
-
-            font-size: 10px;
-        }
-
-        .price {
-            font-size: 23px;
-
-            font-weight: 600;
-
-            margin-bottom: 7px;
-        }
-
-        .change {
-            font-size: 12px;
-
-            color: #35c58a;
-        }
-
-        .bearish {
-            color: #e26d78;
-        }
-
-        .neutral {
-            color: #d6a84f;
-        }
-
-        .score {
-            margin-top: 15px;
-
-            display: flex;
-
-            justify-content: space-between;
-
-            align-items: center;
+            color: var(--muted);
 
             font-size: 11px;
 
-            color: #697584;
+            text-transform: uppercase;
+
+            letter-spacing: 1px;
+
         }
 
-        .score-number {
-            color: #d6a84f;
+        .stat-card .value {
 
-            font-weight: bold;
+            font-size: 25px;
 
-            font-size: 15px;
+            font-weight: 750;
+
+            margin-top: 9px;
+
         }
 
 
-        /* =========================
-           CONTENT GRID
-        ========================= */
+        /* =========================================
+           PANELS
+        ========================================= */
 
-        .content-grid {
+        .grid-2 {
+
             display: grid;
 
-            grid-template-columns: 1.4fr 1fr;
+            grid-template-columns:
+                1fr 1fr;
 
-            gap: 18px;
+            gap: 16px;
+
+        }
+
+        .grid-3 {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(3,1fr);
+
+            gap: 14px;
+
         }
 
         .panel {
-            background: #11171f;
 
-            border: 1px solid #222c37;
+            background: var(--panel);
 
-            border-radius: 9px;
+            border:
+                1px solid var(--border);
 
-            padding: 20px;
+            border-radius: 13px;
+
+            padding: 18px;
+
         }
 
         .panel-header {
+
             display: flex;
 
             justify-content: space-between;
 
             align-items: center;
 
-            margin-bottom: 20px;
+            margin-bottom: 15px;
+
         }
 
-        .panel-title {
-            font-size: 16px;
+        .panel-header h3 {
 
-            font-weight: 600;
+            font-size: 14px;
+
         }
 
-        .panel-label {
-            color: #657180;
+        .panel-header span {
 
-            font-size: 11px;
-        }
-
-
-        /* =========================
-           OPPORTUNITY
-        ========================= */
-
-        .opportunity-symbol {
-            font-size: 27px;
-
-            font-weight: bold;
-        }
-
-        .buy-badge {
-            display: inline-block;
-
-            background: rgba(53, 197, 138, 0.12);
-
-            border: 1px solid rgba(53, 197, 138, 0.3);
-
-            color: #35c58a;
-
-            padding: 5px 10px;
-
-            border-radius: 5px;
+            color: var(--muted);
 
             font-size: 11px;
 
-            font-weight: bold;
-
-            margin-top: 6px;
-        }
-
-        .analysis-list {
-            margin-top: 22px;
-        }
-
-        .analysis-row {
-            display: flex;
-
-            justify-content: space-between;
-
-            padding: 10px 0;
-
-            border-bottom: 1px solid #202832;
-
-            font-size: 13px;
-        }
-
-        .analysis-row:last-child {
-            border-bottom: none;
-        }
-
-        .check {
-            color: #35c58a;
-
-            font-weight: bold;
-        }
-
-        .waiting {
-            color: #d6a84f;
         }
 
 
-        /* =========================
-           TRADE LEVELS
-        ========================= */
+        /* =========================================
+           MARKET CARDS
+        ========================================= */
 
-        .trade-levels {
+        .market-grid {
+
             display: grid;
 
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns:
+                repeat(5,1fr);
 
             gap: 10px;
 
-            margin-top: 20px;
         }
 
-        .level {
-            background: #0c1117;
+        .market-card {
 
-            border: 1px solid #202832;
+            background: var(--panel2);
 
-            padding: 13px;
+            border:
+                1px solid var(--border);
 
-            border-radius: 6px;
+            border-radius: 10px;
+
+            padding: 14px;
+
+            cursor: pointer;
+
+            transition: .2s;
+
         }
 
-        .level-label {
-            color: #667383;
+        .market-card:hover {
+
+            transform:
+                translateY(-2px);
+
+            border-color:
+                #3a485c;
+
+        }
+
+        .market-card .symbol {
+
+            font-weight: 750;
+
+        }
+
+        .market-card .name {
+
+            color: var(--muted);
 
             font-size: 10px;
 
-            text-transform: uppercase;
+            margin-top: 4px;
+
         }
 
-        .level-value {
-            font-size: 14px;
+        .market-price {
 
-            margin-top: 6px;
+            font-size: 17px;
 
-            font-weight: bold;
+            margin-top: 15px;
+
         }
 
-        .rr {
-            color: #d6a84f;
+        .market-change {
+
+            font-size: 11px;
+
+            margin-top: 4px;
+
+        }
+
+        .positive {
+
+            color: var(--green);
+
+        }
+
+        .negative {
+
+            color: var(--red);
+
         }
 
 
-        /* =========================
-           MARKET BIAS
-        ========================= */
+        /* =========================================
+           ANALYSIS
+        ========================================= */
 
-        .bias-row {
-            margin-bottom: 18px;
-        }
+        .analysis-header {
 
-        .bias-header {
             display: flex;
 
             justify-content: space-between;
 
+            align-items: center;
+
+            margin-bottom: 15px;
+
+        }
+
+        .instrument {
+
+            font-size: 25px;
+
+            font-weight: 800;
+
+        }
+
+        .instrument small {
+
+            color: var(--muted);
+
             font-size: 12px;
 
-            margin-bottom: 7px;
+            font-weight: normal;
+
         }
 
-        .bias-value {
-            color: #35c58a;
+
+        .bias {
+
+            padding:
+                9px 15px;
+
+            border-radius: 8px;
+
+            background:
+                rgba(244,201,93,.1);
+
+            color: var(--yellow);
+
+            border:
+                1px solid rgba(244,201,93,.25);
+
+            font-weight: 700;
+
         }
 
-        .bar {
-            height: 6px;
 
-            background: #202832;
+        .chart {
 
-            border-radius: 5px;
+            height: 500px;
+
+            border:
+                1px solid var(--border);
+
+            border-radius: 10px;
 
             overflow: hidden;
-        }
 
-        .bar-fill {
-            height: 100%;
+            margin-bottom: 15px;
 
-            background: #35c58a;
-
-            border-radius: 5px;
         }
 
 
-        /* =========================
-           FUNDAMENTALS
-        ========================= */
+        .timeframes {
 
-        .fundamental {
-            margin-top: 25px;
+            display: flex;
 
-            border-top: 1px solid #202832;
+            gap: 6px;
 
-            padding-top: 20px;
+            margin-bottom: 14px;
+
         }
 
-        .fundamental-title {
+        .timeframe {
+
+            background: var(--panel);
+
+            color: var(--muted);
+
+            border:
+                1px solid var(--border);
+
+            padding:
+                7px 12px;
+
+            border-radius: 6px;
+
+        }
+
+        .timeframe.active {
+
+            color: var(--green);
+
+            border-color:
+                var(--green);
+
+        }
+
+
+        /* =========================================
+           CHECKLIST
+        ========================================= */
+
+        .checklist {
+
+            display: grid;
+
+            grid-template-columns:
+                1fr 1fr;
+
+            gap: 8px;
+
+        }
+
+        .check {
+
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            padding: 11px;
+
+            background: var(--panel2);
+
+            border-radius: 8px;
+
+            border:
+                1px solid var(--border);
+
             font-size: 12px;
 
-            color: #737f8e;
-
-            margin-bottom: 12px;
-
-            text-transform: uppercase;
         }
 
-        .fundamental-bias {
-            font-size: 20px;
+        .check-status {
 
-            color: #35c58a;
+            color: var(--muted);
 
-            font-weight: bold;
         }
 
-        .fundamental-note {
-            color: #697584;
+        .check-status.pass {
+
+            color: var(--green);
+
+        }
+
+        .check-status.fail {
+
+            color: var(--red);
+
+        }
+
+
+        /* =========================================
+           SIGNAL
+        ========================================= */
+
+        .signal-card {
+
+            padding: 20px;
+
+            border-radius: 12px;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(0,214,159,.1),
+                    var(--panel)
+                );
+
+            border:
+                1px solid rgba(0,214,159,.2);
+
+        }
+
+        .signal-label {
+
+            color: var(--muted);
 
             font-size: 11px;
 
-            margin-top: 6px;
+        }
 
-            line-height: 1.5;
+        .signal-value {
+
+            font-size: 32px;
+
+            font-weight: 850;
+
+            color: var(--green);
+
+            margin: 7px 0;
+
+        }
+
+        .levels {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(3,1fr);
+
+            gap: 8px;
+
+            margin-top: 14px;
+
+        }
+
+        .level {
+
+            background: var(--panel2);
+
+            padding: 11px;
+
+            border-radius: 7px;
+
+        }
+
+        .level small {
+
+            display: block;
+
+            color: var(--muted);
+
+            font-size: 10px;
+
+        }
+
+        .level strong {
+
+            display: block;
+
+            margin-top: 5px;
+
         }
 
 
-        /* =========================
-           RESPONSIVE
-        ========================= */
+        /* =========================================
+           SCANNER
+        ========================================= */
 
-        @media (max-width: 1100px) {
+        .scanner-tools {
 
-            .market-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
+            display: flex;
 
-            .content-grid {
-                grid-template-columns: 1fr;
-            }
+            gap: 10px;
+
+            margin-bottom: 15px;
+
         }
 
-        @media (max-width: 700px) {
+        .scan-row {
+
+            display: grid;
+
+            grid-template-columns:
+                1fr 1fr 100px;
+
+            padding: 13px;
+
+            border-bottom:
+                1px solid var(--border);
+
+            cursor: pointer;
+
+            font-size: 12px;
+
+        }
+
+        .scan-row:hover {
+
+            background: var(--panel2);
+
+        }
+
+
+        /* =========================================
+           NEWS
+        ========================================= */
+
+        .news-table {
+
+            width: 100%;
+
+            border-collapse:
+                collapse;
+
+        }
+
+        .news-table th,
+        .news-table td {
+
+            text-align: left;
+
+            padding: 12px 9px;
+
+            border-bottom:
+                1px solid var(--border);
+
+            font-size: 12px;
+
+        }
+
+        .news-table th {
+
+            color: var(--muted);
+
+            font-size: 10px;
+
+            text-transform:
+                uppercase;
+
+        }
+
+        .impact-high {
+
+            color: var(--red);
+
+        }
+
+        .impact-medium {
+
+            color: var(--yellow);
+
+        }
+
+        .impact-low {
+
+            color: var(--blue);
+
+        }
+
+
+        /* =========================================
+           FORMS
+        ========================================= */
+
+        .form-grid {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(3,1fr);
+
+            gap: 12px;
+
+        }
+
+        .form-group label {
+
+            display: block;
+
+            color: var(--muted);
+
+            font-size: 10px;
+
+            margin-bottom: 6px;
+
+            text-transform:
+                uppercase;
+
+        }
+
+        .form-group input,
+        .form-group select {
+
+            width: 100%;
+
+            background: #090e15;
+
+            color: white;
+
+            border:
+                1px solid var(--border);
+
+            border-radius: 7px;
+
+            padding: 10px;
+
+            outline: none;
+
+        }
+
+
+        /* =========================================
+           BACKTEST
+        ========================================= */
+
+        .backtest-results {
+
+            display: grid;
+
+            grid-template-columns:
+                repeat(4,1fr);
+
+            gap: 10px;
+
+            margin-top: 15px;
+
+        }
+
+        .result {
+
+            background: var(--panel2);
+
+            padding: 14px;
+
+            border-radius: 8px;
+
+        }
+
+        .result span {
+
+            color: var(--muted);
+
+            font-size: 10px;
+
+        }
+
+        .result strong {
+
+            display: block;
+
+            font-size: 18px;
+
+            margin-top: 5px;
+
+        }
+
+        .equity-chart {
+
+            height: 300px;
+
+            margin-top: 15px;
+
+            border:
+                1px solid var(--border);
+
+            border-radius: 9px;
+
+        }
+
+
+        /* =========================================
+           JOURNAL
+        ========================================= */
+
+        .journal-table {
+
+            width: 100%;
+
+            border-collapse:
+                collapse;
+
+        }
+
+        .journal-table th,
+        .journal-table td {
+
+            padding: 11px;
+
+            text-align: left;
+
+            border-bottom:
+                1px solid var(--border);
+
+            font-size: 11px;
+
+        }
+
+        .journal-table th {
+
+            color: var(--muted);
+
+        }
+
+
+        /* =========================================
+           AI STATUS
+        ========================================= */
+
+        .ai-box {
+
+            border:
+                1px solid rgba(169,120,255,.3);
+
+            background:
+                rgba(169,120,255,.05);
+
+            padding: 18px;
+
+            border-radius: 10px;
+
+        }
+
+        .ai-box h3 {
+
+            color: var(--purple);
+
+            margin-bottom: 8px;
+
+        }
+
+        .ai-box p {
+
+            color: var(--muted);
+
+            font-size: 12px;
+
+            line-height: 1.6;
+
+        }
+
+
+        /* =========================================
+           MOBILE
+        ========================================= */
+
+        @media(max-width: 1000px) {
 
             .sidebar {
-                display: none;
+
+                width: 210px;
+
             }
 
             .main {
+
+                margin-left: 210px;
+
+                width:
+                    calc(100% - 210px);
+
+            }
+
+            .market-grid {
+
+                grid-template-columns:
+                    repeat(3,1fr);
+
+            }
+
+            .stat-grid {
+
+                grid-template-columns:
+                    repeat(2,1fr);
+
+            }
+
+        }
+
+
+        @media(max-width: 700px) {
+
+            .sidebar {
+
+                position:
+                    relative;
+
+                width: 100%;
+
+                height: auto;
+
+            }
+
+            .connection {
+
+                position:
+                    static;
+
+                margin-top: 20px;
+
+            }
+
+            .main {
+
                 margin-left: 0;
 
                 width: 100%;
 
-                padding: 18px;
+                padding: 15px;
+
+            }
+
+            .app {
+
+                display: block;
+
+            }
+
+            .grid-2,
+            .grid-3 {
+
+                grid-template-columns:
+                    1fr;
+
             }
 
             .market-grid {
-                grid-template-columns: 1fr;
+
+                grid-template-columns:
+                    repeat(2,1fr);
+
             }
+
+            .form-grid {
+
+                grid-template-columns:
+                    1fr;
+
+            }
+
         }
 
     </style>
@@ -562,710 +1260,2180 @@
 
 <body>
 
+
 <div class="app">
 
 
-    <!-- =========================
-         SIDEBAR
-    ========================= -->
+<!-- =====================================================
+     SIDEBAR
+====================================================== -->
 
-    <aside class="sidebar">
+<aside class="sidebar">
 
-        <div class="logo">
-            AUREUS <span>AI</span>
+    <div class="brand">
+
+        <h1>
+            AUREUS<span>•</span>
+        </h1>
+
+        <p>
+            INTELLIGENT MARKET SYSTEM
+        </p>
+
+    </div>
+
+
+    <div class="nav-title">
+        CORE
+    </div>
+
+    <button
+        class="nav-item active"
+        data-page="dashboard"
+    >
+        <span class="nav-icon">⌂</span>
+        Dashboard
+    </button>
+
+    <button
+        class="nav-item"
+        data-page="markets"
+    >
+        <span class="nav-icon">◈</span>
+        Markets
+    </button>
+
+    <button
+        class="nav-item"
+        data-page="scanner"
+    >
+        <span class="nav-icon">⌕</span>
+        Market Scanner
+    </button>
+
+
+    <div class="nav-title">
+        INTELLIGENCE
+    </div>
+
+    <button
+        class="nav-item"
+        data-page="analysis"
+    >
+        <span class="nav-icon">◉</span>
+        Technical Analysis
+    </button>
+
+    <button
+        class="nav-item"
+        data-page="fundamentals"
+    >
+        <span class="nav-icon">◎</span>
+        Fundamentals
+    </button>
+
+    <button
+        class="nav-item"
+        data-page="news"
+    >
+        <span class="nav-icon">◆</span>
+        News Trading
+    </button>
+
+
+    <div class="nav-title">
+        RESEARCH
+    </div>
+
+    <button
+        class="nav-item"
+        data-page="backtest"
+    >
+        <span class="nav-icon">▣</span>
+        Backtesting
+    </button>
+
+    <button
+        class="nav-item"
+        data-page="journal"
+    >
+        <span class="nav-icon">▤</span>
+        Trade Journal
+    </button>
+
+
+    <div class="nav-title">
+        SYSTEM
+    </div>
+
+    <button
+        class="nav-item"
+        data-page="ai"
+    >
+        <span class="nav-icon">✦</span>
+        AI Research
+    </button>
+
+    <button
+        class="nav-item"
+        data-page="settings"
+    >
+        <span class="nav-icon">⚙</span>
+        Settings
+    </button>
+
+
+    <div class="connection">
+
+        <span class="connection-dot"></span>
+
+        <strong>
+            DATA STATUS
+        </strong>
+
+        <small>
+            Development / simulated data
+        </small>
+
+    </div>
+
+</aside>
+
+
+<!-- =====================================================
+     MAIN
+====================================================== -->
+
+<main class="main">
+
+
+<header class="topbar">
+
+    <div class="page-title">
+
+        <h2 id="pageHeading">
+            Aureus Dashboard
+        </h2>
+
+        <p id="pageSubheading">
+            Universal multi-market intelligence
+        </p>
+
+    </div>
+
+
+    <div class="top-actions">
+
+        <button
+            class="btn"
+            id="refreshData"
+        >
+            ↻ Refresh
+        </button>
+
+        <button
+            class="btn btn-primary"
+            id="scanMarkets"
+        >
+            Scan Markets
+        </button>
+
+    </div>
+
+</header>
+
+
+<!-- =====================================================
+     DASHBOARD PAGE
+====================================================== -->
+
+<section
+    id="dashboard"
+    class="page active"
+>
+
+    <div class="hero">
+
+        <h3>
+            Find the market that actually qualifies.
+        </h3>
+
+        <p>
+            Aureus evaluates markets from higher-timeframe
+            structure down to execution conditions, then
+            combines technical, fundamental and news context
+            before producing a potential setup.
+        </p>
+
+    </div>
+
+
+    <div class="stat-grid">
+
+        <div class="stat-card">
+
+            <div class="label">
+                Markets Monitored
+            </div>
+
+            <div class="value">
+                10
+            </div>
+
         </div>
 
-        <div class="subtitle">
-            MARKET INTELLIGENCE
+
+        <div class="stat-card">
+
+            <div class="label">
+                Valid Setups
+            </div>
+
+            <div
+                class="value positive"
+                id="validSetups"
+            >
+                —
+            </div>
+
         </div>
 
 
-        <div class="nav-title">
-            Main
-        </div>
+        <div class="stat-card">
 
-        <div class="nav-item active">
-            ◈ Dashboard
-        </div>
+            <div class="label">
+                Current Bias
+            </div>
 
-        <div class="nav-item">
-            ◉ Markets
-        </div>
+            <div
+                class="value"
+                id="dashboardBias"
+            >
+                NEUTRAL
+            </div>
 
-        <div class="nav-item">
-            ◌ Technical Analysis
-        </div>
-
-        <div class="nav-item">
-            ◈ Fundamentals
-        </div>
-
-        <div class="nav-item">
-            ◉ News Trading
         </div>
 
 
-        <div class="nav-title">
-            Research
+        <div class="stat-card">
+
+            <div class="label">
+                System Score
+            </div>
+
+            <div
+                class="value"
+                id="dashboardScore"
+            >
+                —
+            </div>
+
         </div>
 
-        <div class="nav-item">
-            ◈ Signals
+    </div>
+
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Markets
+            </h3>
+
+            <span>
+                Click a market to analyze
+            </span>
+
         </div>
 
-        <div class="nav-item">
-            ◈ Backtesting
+
+        <div
+            class="market-grid"
+            id="dashboardMarkets"
+        >
+
         </div>
 
-        <div class="nav-item">
-            ◈ AI Research
+    </div>
+
+
+    <br>
+
+
+    <div class="grid-2">
+
+        <div class="ai-box">
+
+            <h3>
+                ✦ Aureus Intelligence
+            </h3>
+
+            <p>
+                The system is currently operating in
+                research mode. No real orders are placed.
+                Signals are designed to become fully
+                data-driven once live feeds are connected.
+            </p>
+
         </div>
 
-        <div class="nav-item">
-            ◈ Trade Journal
+
+        <div class="panel">
+
+            <div class="panel-header">
+
+                <h3>
+                    System Pipeline
+                </h3>
+
+            </div>
+
+            <p style="color:#7f8b9b;font-size:12px;line-height:2">
+
+                Daily Bias →
+                4H Structure →
+                1H Structure →
+                Liquidity →
+                OB/FVG →
+                Entry →
+                Risk →
+                Fundamentals →
+                News →
+                Final Signal
+
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =====================================================
+     MARKETS
+====================================================== -->
+
+<section
+    id="markets"
+    class="page"
+>
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Universal Market Watchlist
+            </h3>
+
+            <span>
+                Forex • Metals • Indices • Crypto
+            </span>
+
         </div>
 
 
-        <div class="nav-title">
-            System
+        <div
+            class="market-grid"
+            id="marketsGrid"
+        >
+
         </div>
 
-        <div class="nav-item">
-            ⚙ Settings
+    </div>
+
+</section>
+
+
+<!-- =====================================================
+     SCANNER
+====================================================== -->
+
+<section
+    id="scanner"
+    class="page"
+>
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Universal Market Scanner
+            </h3>
+
+            <span>
+                Highest-conviction opportunities first
+            </span>
+
         </div>
 
-    </aside>
+
+        <div class="scanner-tools">
+
+            <button
+                class="btn btn-primary"
+                id="runScan"
+            >
+                Run Full Scan
+            </button>
+
+            <select
+                class="btn"
+                id="scannerCategory"
+            >
+
+                <option value="ALL">
+                    All Markets
+                </option>
+
+                <option value="FOREX">
+                    Forex
+                </option>
+
+                <option value="METALS">
+                    Metals
+                </option>
+
+                <option value="INDEX">
+                    Indices
+                </option>
+
+                <option value="CRYPTO">
+                    Crypto
+                </option>
+
+            </select>
+
+        </div>
 
 
+        <div id="scanResults">
 
-    <!-- =========================
-         MAIN CONTENT
-    ========================= -->
+            <div
+                style="
+                padding:20px;
+                color:#7f8b9b;
+                "
+            >
+                Run a scan to evaluate markets.
+            </div>
 
-    <main class="main">
+        </div>
+
+    </div>
+
+</section>
 
 
-        <!-- TOP BAR -->
+<!-- =====================================================
+     ANALYSIS
+====================================================== -->
 
-        <div class="topbar">
+<section
+    id="analysis"
+    class="page"
+>
 
-            <div>
+    <div class="analysis-header">
 
-                <div class="page-title">
-                    Market Overview
-                </div>
+        <div>
 
-                <div class="page-description">
-                    Universal multi-asset strategy scanner
-                </div>
+            <div
+                class="instrument"
+                id="analysisSymbol"
+            >
+                XAU/USD
+
+                <small>
+                    Gold
+                </small>
+
+            </div>
+
+            <div
+                style="
+                color:#7f8b9b;
+                font-size:11px;
+                margin-top:5px;
+                "
+                id="analysisTimeframe"
+            >
+                1H
+            </div>
+
+        </div>
+
+
+        <div
+            class="bias"
+            id="analysisBias"
+        >
+            NEUTRAL
+        </div>
+
+    </div>
+
+
+    <div class="timeframes">
+
+        <button
+            class="timeframe"
+            data-timeframe="D1"
+        >
+            D1
+        </button>
+
+        <button
+            class="timeframe"
+            data-timeframe="H4"
+        >
+            H4
+        </button>
+
+        <button
+            class="timeframe active"
+            data-timeframe="H1"
+        >
+            H1
+        </button>
+
+        <button
+            class="timeframe"
+            data-timeframe="M30"
+        >
+            M30
+        </button>
+
+        <button
+            class="timeframe"
+            data-timeframe="M15"
+        >
+            M15
+        </button>
+
+        <button
+            class="timeframe"
+            data-timeframe="M5"
+        >
+            M5
+        </button>
+
+    </div>
+
+
+    <div
+        class="chart"
+        id="marketChart"
+    >
+
+        <div
+            style="
+            height:100%;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            color:#536071;
+            "
+        >
+            Awaiting market data...
+        </div>
+
+    </div>
+
+
+    <div class="grid-2">
+
+
+        <div class="panel">
+
+            <div class="panel-header">
+
+                <h3>
+                    Technical Qualification
+                </h3>
+
+                <span>
+                    Strict checklist
+                </span>
 
             </div>
 
 
-            <div class="system-status">
+            <div class="checklist">
 
-                <div class="status-dot"></div>
+                <div class="check">
+                    <span>Higher TF Bias</span>
+                    <span
+                        class="check-status"
+                        id="checkBias"
+                    >
+                        —
+                    </span>
+                </div>
 
-                SYSTEM ONLINE
+                <div class="check">
+                    <span>Valid High / Low</span>
+                    <span
+                        class="check-status"
+                        id="checkStructure"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="check">
+                    <span>Support / Resistance</span>
+                    <span
+                        class="check-status"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="check">
+                    <span>Supply / Demand</span>
+                    <span
+                        class="check-status"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="check">
+                    <span>Order Block</span>
+                    <span
+                        class="check-status"
+                        id="checkOB"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="check">
+                    <span>Fair Value Gap</span>
+                    <span
+                        class="check-status"
+                        id="checkFVG"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="check">
+                    <span>Liquidity Sweep</span>
+                    <span
+                        class="check-status"
+                        id="checkLiquidity"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="check">
+                    <span>Structure Shift</span>
+                    <span
+                        class="check-status"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="check">
+                    <span>Candlestick Confirmation</span>
+                    <span
+                        class="check-status"
+                    >
+                        —
+                    </span>
+                </div>
+
+                <div class="check">
+                    <span>Risk / Reward ≥ 2</span>
+                    <span
+                        class="check-status"
+                        id="checkRR"
+                    >
+                        —
+                    </span>
+                </div>
 
             </div>
 
         </div>
 
 
+        <div class="signal-card">
 
-        <!-- =========================
-             MARKET SCANNER
-        ========================= -->
+            <div class="signal-label">
+                AUREUS FINAL DECISION
+            </div>
 
-        <div class="section-title">
-            Market Scanner
-        </div>
+            <div
+                class="signal-value"
+                id="signalValue"
+            >
+                WAIT
+            </div>
 
-
-        <div class="market-grid">
-
-
-            <!-- GBP/USD -->
-
-            <div class="market-card">
-
-                <div class="market-header">
-
-                    <div>
-
-                        <div class="instrument">
-                            GBP/USD
-                        </div>
-
-                        <div class="asset-type">
-                            FOREX
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <div class="price">
-                    1.3418
-                </div>
-
-
-                <div class="change">
-                    ▲ +0.42%
-                </div>
-
-
-                <div class="score">
-
-                    <span>
-                        Setup Score
-                    </span>
-
-                    <span class="score-number">
-                        72
-                    </span>
-
-                </div>
-
+            <div
+                style="
+                color:#7f8b9b;
+                font-size:12px;
+                "
+                id="signalReason"
+            >
+                Waiting for valid technical conditions.
             </div>
 
 
+            <div class="levels">
 
-            <!-- XAU/USD -->
+                <div class="level">
 
-            <div class="market-card">
+                    <small>
+                        ENTRY
+                    </small>
 
-                <div class="market-header">
-
-                    <div>
-
-                        <div class="instrument">
-                            XAU/USD
-                        </div>
-
-                        <div class="asset-type">
-                            METAL
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <div class="price">
-                    3,342.50
-                </div>
-
-
-                <div class="change">
-                    ▲ +0.81%
-                </div>
-
-
-                <div class="score">
-
-                    <span>
-                        Setup Score
-                    </span>
-
-                    <span class="score-number">
-                        86
-                    </span>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- NAS100 -->
-
-            <div class="market-card">
-
-                <div class="market-header">
-
-                    <div>
-
-                        <div class="instrument">
-                            NAS100
-                        </div>
-
-                        <div class="asset-type">
-                            INDEX
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <div class="price">
-                    23,481
-                </div>
-
-
-                <div class="change">
-                    ▲ +0.35%
-                </div>
-
-
-                <div class="score">
-
-                    <span>
-                        Setup Score
-                    </span>
-
-                    <span class="score-number">
-                        79
-                    </span>
-
-                </div>
-
-            </div>
-
-
-
-            <!-- EUR/USD -->
-
-            <div class="market-card">
-
-                <div class="market-header">
-
-                    <div>
-
-                        <div class="instrument">
-                            EUR/USD
-                        </div>
-
-                        <div class="asset-type">
-                            FOREX
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-                <div class="price">
-                    1.1712
-                </div>
-
-
-                <div class="change neutral">
-                    — 0.03%
-                </div>
-
-
-                <div class="score">
-
-                    <span>
-                        Setup Score
-                    </span>
-
-                    <span class="score-number">
-                        51
-                    </span>
-
-                </div>
-
-            </div>
-
-
-        </div>
-
-
-
-        <!-- =========================
-             LOWER CONTENT
-        ========================= -->
-
-        <div class="content-grid">
-
-
-            <!-- =========================
-                 BEST OPPORTUNITY
-            ========================= -->
-
-            <div class="panel">
-
-
-                <div class="panel-header">
-
-                    <div class="panel-title">
-                        Best Opportunity
-                    </div>
-
-                    <div class="panel-label">
-                        AI SCANNER
-                    </div>
-
-                </div>
-
-
-                <div class="opportunity-symbol">
-                    XAU/USD
-                </div>
-
-
-                <div class="buy-badge">
-                    BUY SETUP
-                </div>
-
-
-
-                <div class="analysis-list">
-
-
-                    <div class="analysis-row">
-
-                        <span>
-                            Higher Timeframe Bias
-                        </span>
-
-                        <span class="check">
-                            ✓ BULLISH
-                        </span>
-
-                    </div>
-
-
-                    <div class="analysis-row">
-
-                        <span>
-                            Support / Demand
-                        </span>
-
-                        <span class="check">
-                            ✓ CONFIRMED
-                        </span>
-
-                    </div>
-
-
-                    <div class="analysis-row">
-
-                        <span>
-                            Order Block
-                        </span>
-
-                        <span class="check">
-                            ✓ CONFIRMED
-                        </span>
-
-                    </div>
-
-
-                    <div class="analysis-row">
-
-                        <span>
-                            Fair Value Gap
-                        </span>
-
-                        <span class="check">
-                            ✓ PRESENT
-                        </span>
-
-                    </div>
-
-
-                    <div class="analysis-row">
-
-                        <span>
-                            Liquidity Sweep
-                        </span>
-
-                        <span class="check">
-                            ✓ CONFIRMED
-                        </span>
-
-                    </div>
-
-
-                    <div class="analysis-row">
-
-                        <span>
-                            Market Structure
-                        </span>
-
-                        <span class="check">
-                            ✓ BOS
-                        </span>
-
-                    </div>
-
-
-                    <div class="analysis-row">
-
-                        <span>
-                            Fundamental Alignment
-                        </span>
-
-                        <span class="check">
-                            ✓ BULLISH
-                        </span>
-
-                    </div>
-
-
-                </div>
-
-
-
-                <!-- TRADE LEVELS -->
-
-                <div class="trade-levels">
-
-
-                    <div class="level">
-
-                        <div class="level-label">
-                            Entry
-                        </div>
-
-                        <div class="level-value">
-                            3,342.50
-                        </div>
-
-                    </div>
-
-
-                    <div class="level">
-
-                        <div class="level-label">
-                            Stop Loss
-                        </div>
-
-                        <div class="level-value">
-                            3,318.00
-                        </div>
-
-                    </div>
-
-
-                    <div class="level">
-
-                        <div class="level-label">
-                            Target
-                        </div>
-
-                        <div class="level-value">
-                            3,416.00
-                        </div>
-
-                    </div>
-
-
-                </div>
-
-
-                <div style="
-                    margin-top:15px;
-                    font-size:12px;
-                    color:#697584;
-                ">
-
-                    Risk / Reward:
-
-                    <strong class="rr">
-                        1 : 3.0
+                    <strong id="entryPrice">
+                        —
                     </strong>
 
                 </div>
 
+                <div class="level">
+
+                    <small>
+                        STOP LOSS
+                    </small>
+
+                    <strong id="stopPrice">
+                        —
+                    </strong>
+
+                </div>
+
+                <div class="level">
+
+                    <small>
+                        TAKE PROFIT
+                    </small>
+
+                    <strong id="targetPrice">
+                        —
+                    </strong>
+
+                </div>
 
             </div>
 
 
-
-            <!-- =========================
-                 MARKET BIAS
-            ========================= -->
-
-            <div class="panel">
-
-
-                <div class="panel-header">
-
-                    <div class="panel-title">
-                        Market Bias
-                    </div>
-
-                    <div class="panel-label">
-                        XAU/USD
-                    </div>
-
-                </div>
-
-
-
-                <!-- DAILY -->
-
-                <div class="bias-row">
-
-                    <div class="bias-header">
-
-                        <span>
-                            Daily
-                        </span>
-
-                        <span class="bias-value">
-                            BULLISH
-                        </span>
-
-                    </div>
-
-
-                    <div class="bar">
-
-                        <div
-                            class="bar-fill"
-                            style="width:88%;">
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-
-                <!-- 4 HOUR -->
-
-                <div class="bias-row">
-
-                    <div class="bias-header">
-
-                        <span>
-                            4 Hour
-                        </span>
-
-                        <span class="bias-value">
-                            BULLISH
-                        </span>
-
-                    </div>
-
-
-                    <div class="bar">
-
-                        <div
-                            class="bar-fill"
-                            style="width:82%;">
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-
-                <!-- 1 HOUR -->
-
-                <div class="bias-row">
-
-                    <div class="bias-header">
-
-                        <span>
-                            1 Hour
-                        </span>
-
-                        <span class="bias-value">
-                            BULLISH
-                        </span>
-
-                    </div>
-
-
-                    <div class="bar">
-
-                        <div
-                            class="bar-fill"
-                            style="width:76%;">
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-
-                <!-- 15 MIN -->
-
-                <div class="bias-row">
-
-                    <div class="bias-header">
-
-                        <span>
-                            15 Minute
-                        </span>
-
-                        <span class="bias-value">
-                            BULLISH
-                        </span>
-
-                    </div>
-
-
-                    <div class="bar">
-
-                        <div
-                            class="bar-fill"
-                            style="width:69%;">
-                        </div>
-
-                    </div>
-
-                </div>
-
-
-
-                <!-- FUNDAMENTAL BIAS -->
-
-                <div class="fundamental">
-
-                    <div class="fundamental-title">
-                        Fundamental Bias
-                    </div>
-
-
-                    <div class="fundamental-bias">
-                        BULLISH
-                    </div>
-
-
-                    <div class="fundamental-note">
-
-                        Macro conditions currently align with
-                        the technical setup.
-
-                        Real economic data will replace this
-                        placeholder later.
-
-                    </div>
-
-                </div>
-
+            <div
+                style="
+                margin-top:15px;
+                color:#7f8b9b;
+                font-size:11px;
+                "
+            >
+
+                Score:
+                <strong
+                    id="analysisScore"
+                    style="color:white"
+                >
+                    —
+                </strong>
+
+                &nbsp; | &nbsp;
+
+                R:R:
+                <strong
+                    id="analysisRR"
+                    style="color:white"
+                >
+                    —
+                </strong>
 
             </div>
 
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =====================================================
+     FUNDAMENTALS
+====================================================== -->
+
+<section
+    id="fundamentals"
+    class="page"
+>
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Fundamental Intelligence
+            </h3>
+
+            <span>
+                Macro bias engine
+            </span>
 
         </div>
 
 
-    </main>
+        <div class="grid-3">
+
+            <div class="stat-card">
+
+                <div class="label">
+                    USD Bias
+                </div>
+
+                <div
+                    class="value"
+                    id="usdBias"
+                >
+                    NEUTRAL
+                </div>
+
+            </div>
+
+            <div class="stat-card">
+
+                <div class="label">
+                    Interest Rate Expectation
+                </div>
+
+                <div
+                    class="value"
+                    id="rateBias"
+                >
+                    —
+                </div>
+
+            </div>
+
+            <div class="stat-card">
+
+                <div class="label">
+                    Risk Sentiment
+                </div>
+
+                <div
+                    class="value"
+                    id="riskBias"
+                >
+                    —
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <br>
+
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Fundamental Checklist
+            </h3>
+
+        </div>
+
+
+        <div class="checklist">
+
+            <div class="check">
+                <span>Inflation Trend</span>
+                <span class="check-status">DATA REQUIRED</span>
+            </div>
+
+            <div class="check">
+                <span>Employment</span>
+                <span class="check-status">DATA REQUIRED</span>
+            </div>
+
+            <div class="check">
+                <span>GDP Growth</span>
+                <span class="check-status">DATA REQUIRED</span>
+            </div>
+
+            <div class="check">
+                <span>Central Bank Policy</span>
+                <span class="check-status">DATA REQUIRED</span>
+            </div>
+
+            <div class="check">
+                <span>Bond Yields</span>
+                <span class="check-status">DATA REQUIRED</span>
+            </div>
+
+            <div class="check">
+                <span>Dollar Strength</span>
+                <span class="check-status">DATA REQUIRED</span>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =====================================================
+     NEWS
+====================================================== -->
+
+<section
+    id="news"
+    class="page"
+>
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Economic Calendar
+            </h3>
+
+            <span>
+                Actual vs Forecast vs Previous
+            </span>
+
+        </div>
+
+
+        <div
+            style="
+            overflow-x:auto;
+            "
+        >
+
+            <table class="news-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Time
+                        </th>
+
+                        <th>
+                            Currency
+                        </th>
+
+                        <th>
+                            Event
+                        </th>
+
+                        <th>
+                            Impact
+                        </th>
+
+                        <th>
+                            Actual
+                        </th>
+
+                        <th>
+                            Forecast
+                        </th>
+
+                        <th>
+                            Previous
+                        </th>
+
+                        <th>
+                            Aureus View
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody
+                    id="newsTable"
+                >
+
+                    <tr>
+
+                        <td colspan="8">
+
+                            <span
+                                style="
+                                color:#7f8b9b;
+                                "
+                            >
+                                News data source not connected yet.
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <br>
+
+
+    <div class="grid-2">
+
+        <div class="ai-box">
+
+            <h3>
+                News Reaction Engine
+            </h3>
+
+            <p>
+                Aureus will compare actual economic data
+                against consensus forecasts and previous
+                releases, then evaluate whether the surprise
+                supports or contradicts the existing
+                technical setup.
+            </p>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h3
+                style="font-size:14px;margin-bottom:10px"
+            >
+                News Trading Rule
+            </h3>
+
+            <p
+                style="
+                color:#7f8b9b;
+                font-size:12px;
+                line-height:1.7;
+                "
+            >
+                A news release does not automatically create
+                a trade. Aureus must first determine the
+                expected macro direction, compare actual
+                versus forecast, observe the reaction and
+                then determine whether the technical setup
+                remains valid.
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =====================================================
+     BACKTEST
+====================================================== -->
+
+<section
+    id="backtest"
+    class="page"
+>
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Strategy Backtester
+            </h3>
+
+            <span>
+                Historical research — no real orders
+            </span>
+
+        </div>
+
+
+        <div class="form-grid">
+
+            <div class="form-group">
+
+                <label>
+                    Market
+                </label>
+
+                <select id="backtestMarket">
+
+                    <option>
+                        XAU/USD
+                    </option>
+
+                    <option>
+                        GBP/USD
+                    </option>
+
+                    <option>
+                        EUR/USD
+                    </option>
+
+                    <option>
+                        USD/JPY
+                    </option>
+
+                    <option>
+                        NAS100
+                    </option>
+
+                    <option>
+                        US30
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Timeframe
+                </label>
+
+                <select id="backtestTimeframe">
+
+                    <option>
+                        1H
+                    </option>
+
+                    <option>
+                        4H
+                    </option>
+
+                    <option>
+                        15M
+                    </option>
+
+                    <option>
+                        5M
+                    </option>
+
+                </select>
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Starting Capital
+                </label>
+
+                <input
+                    id="startingCapital"
+                    type="number"
+                    value="10000"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Risk Per Trade %
+                </label>
+
+                <input
+                    id="riskPercent"
+                    type="number"
+                    value="1"
+                    step="0.1"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Minimum Score
+                </label>
+
+                <input
+                    id="minimumScore"
+                    type="number"
+                    value="75"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Minimum R:R
+                </label>
+
+                <input
+                    id="minimumRR"
+                    type="number"
+                    value="2"
+                    step="0.1"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Start Date
+                </label>
+
+                <input
+                    id="backtestStart"
+                    type="date"
+                    value="2022-01-01"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    End Date
+                </label>
+
+                <input
+                    id="backtestEnd"
+                    type="date"
+                    value="2026-01-01"
+                >
+
+            </div>
+
+        </div>
+
+
+        <br>
+
+
+        <button
+            class="btn btn-primary"
+            id="runBacktest"
+        >
+            ▶ Run Backtest
+        </button>
+
+    </div>
+
+
+    <br>
+
+
+    <div
+        class="backtest-results"
+        id="backtestResults"
+    >
+
+        <div class="result">
+            <span>WIN RATE</span>
+            <strong>—</strong>
+        </div>
+
+        <div class="result">
+            <span>PROFIT FACTOR</span>
+            <strong>—</strong>
+        </div>
+
+        <div class="result">
+            <span>NET PROFIT</span>
+            <strong>—</strong>
+        </div>
+
+        <div class="result">
+            <span>MAX DRAWDOWN</span>
+            <strong>—</strong>
+        </div>
+
+        <div class="result">
+            <span>TOTAL TRADES</span>
+            <strong>—</strong>
+        </div>
+
+        <div class="result">
+            <span>AVERAGE R</span>
+            <strong>—</strong>
+        </div>
+
+        <div class="result">
+            <span>EXPECTANCY</span>
+            <strong>—</strong>
+        </div>
+
+        <div class="result">
+            <span>LOSS STREAK</span>
+            <strong>—</strong>
+        </div>
+
+    </div>
+
+
+    <div
+        class="panel"
+        style="margin-top:15px"
+    >
+
+        <div class="panel-header">
+
+            <h3>
+                Equity Curve
+            </h3>
+
+            <span>
+                Will populate after historical data is connected
+            </span>
+
+        </div>
+
+
+        <div
+            class="equity-chart"
+            id="equityChart"
+        >
+
+            <div
+                style="
+                height:100%;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                color:#536071;
+                "
+            >
+                No backtest results yet.
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =====================================================
+     JOURNAL
+====================================================== -->
+
+<section
+    id="journal"
+    class="page"
+>
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Aureus Trade Journal
+            </h3>
+
+            <span>
+                Every decision recorded
+            </span>
+
+        </div>
+
+
+        <div
+            style="overflow-x:auto"
+        >
+
+            <table class="journal-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>
+                            Date
+                        </th>
+
+                        <th>
+                            Market
+                        </th>
+
+                        <th>
+                            Direction
+                        </th>
+
+                        <th>
+                            Score
+                        </th>
+
+                        <th>
+                            Entry
+                        </th>
+
+                        <th>
+                            SL
+                        </th>
+
+                        <th>
+                            TP
+                        </th>
+
+                        <th>
+                            Result
+                        </th>
+
+                        <th>
+                            R
+                        </th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody
+                    id="journalTable"
+                >
+
+                    <tr>
+
+                        <td colspan="9">
+
+                            <span
+                                style="color:#7f8b9b"
+                            >
+                                No trades recorded yet.
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =====================================================
+     AI RESEARCH
+====================================================== -->
+
+<section
+    id="ai"
+    class="page"
+>
+
+    <div class="ai-box">
+
+        <h3>
+            ✦ Aureus AI Research Lab
+        </h3>
+
+        <p>
+            This section will eventually compare different
+            versions of the strategy and determine which
+            conditions genuinely improve expectancy.
+        </p>
+
+    </div>
+
+
+    <br>
+
+
+    <div class="grid-3">
+
+        <div class="panel">
+
+            <h3>
+                Technical Only
+            </h3>
+
+            <p
+                style="
+                color:#7f8b9b;
+                margin-top:10px;
+                font-size:12px;
+                "
+            >
+                Baseline strategy performance.
+            </p>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h3>
+                Technical + Fundamentals
+            </h3>
+
+            <p
+                style="
+                color:#7f8b9b;
+                margin-top:10px;
+                font-size:12px;
+                "
+            >
+                Measures whether macro context improves
+                the strategy.
+            </p>
+
+        </div>
+
+
+        <div class="panel">
+
+            <h3>
+                Technical + Fundamentals + News
+            </h3>
+
+            <p
+                style="
+                color:#7f8b9b;
+                margin-top:10px;
+                font-size:12px;
+                "
+            >
+                Measures whether news filtering improves
+                risk-adjusted performance.
+            </p>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- =====================================================
+     SETTINGS
+====================================================== -->
+
+<section
+    id="settings"
+    class="page"
+>
+
+    <div class="panel">
+
+        <div class="panel-header">
+
+            <h3>
+                Aureus Configuration
+            </h3>
+
+        </div>
+
+
+        <div class="form-grid">
+
+            <div class="form-group">
+
+                <label>
+                    Minimum Signal Score
+                </label>
+
+                <input
+                    type="number"
+                    value="75"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Minimum Risk / Reward
+                </label>
+
+                <input
+                    type="number"
+                    value="2"
+                    step=".1"
+                >
+
+            </div>
+
+
+            <div class="form-group">
+
+                <label>
+                    Risk Per Trade %
+                </label>
+
+                <input
+                    type="number"
+                    value="1"
+                    step=".1"
+                >
+
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+</main>
 
 </div>
 
 
+<!-- =====================================================
+     JAVASCRIPT
+====================================================== -->
 
-<!-- =========================
-     AUREUS AI JAVASCRIPT
-========================= -->
+<script src="assets/app.js"></script>
+<script src="assets/chart.js"></script>
 
-<script src="script.js"></script>
+
+<script>
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+
+        /*
+        ================================================
+        MARKET LIST
+        ================================================
+        */
+
+        const markets = [
+
+            ["XAU/USD","Gold","METALS"],
+            ["EUR/USD","Euro / Dollar","FOREX"],
+            ["GBP/USD","Pound / Dollar","FOREX"],
+            ["USD/JPY","Dollar / Yen","FOREX"],
+            ["USD/CAD","Dollar / Canadian","FOREX"],
+            ["AUD/USD","Australian Dollar","FOREX"],
+            ["NAS100","Nasdaq 100","INDEX"],
+            ["US30","Dow Jones","INDEX"],
+            ["SPX500","S&P 500","INDEX"],
+            ["BTC/USD","Bitcoin","CRYPTO"]
+
+        ];
+
+
+        function createMarketCard(
+            market
+        ) {
+
+            const card =
+                document.createElement(
+                    "div"
+                );
+
+            card.className =
+                "market-card";
+
+
+            card.dataset.symbol =
+                market[0];
+
+
+            card.innerHTML = `
+
+                <div class="symbol">
+                    ${market[0]}
+                </div>
+
+                <div class="name">
+                    ${market[1]}
+                </div>
+
+                <div class="market-price">
+                    —
+                </div>
+
+                <div class="market-change">
+                    ${market[2]}
+                </div>
+
+            `;
+
+
+            card.addEventListener(
+                "click",
+                function () {
+
+                    selectMarket(
+                        market[0],
+                        market[1]
+                    );
+
+                }
+            );
+
+
+            return card;
+
+        }
+
+
+        /*
+        Dashboard markets
+        */
+
+        const dashboardMarkets =
+            document.getElementById(
+                "dashboardMarkets"
+            );
+
+
+        markets
+            .slice(0,10)
+            .forEach(
+                market => {
+
+                    dashboardMarkets
+                        .appendChild(
+                            createMarketCard(
+                                market
+                            )
+                        );
+
+                }
+            );
+
+
+        /*
+        Markets page
+        */
+
+        const marketsGrid =
+            document.getElementById(
+                "marketsGrid"
+            );
+
+
+        markets.forEach(
+            market => {
+
+                marketsGrid
+                    .appendChild(
+                        createMarketCard(
+                            market
+                        )
+                    );
+
+            }
+        );
+
+
+        /*
+        ================================================
+        MARKET SELECTION
+        ================================================
+        */
+
+        function selectMarket(
+            symbol,
+            name
+        ) {
+
+            document
+                .querySelectorAll(
+                    ".page"
+                )
+                .forEach(
+                    page =>
+                        page.classList
+                            .remove(
+                                "active"
+                            )
+                );
+
+
+            document
+                .getElementById(
+                    "analysis"
+                )
+                .classList
+                .add(
+                    "active"
+                );
+
+
+            document
+                .querySelectorAll(
+                    ".nav-item"
+                )
+                .forEach(
+                    item =>
+                        item.classList
+                            .remove(
+                                "active"
+                            )
+                );
+
+
+            document
+                .querySelector(
+                    '[data-page="analysis"]'
+                )
+                .classList
+                .add(
+                    "active"
+                );
+
+
+            document
+                .getElementById(
+                    "analysisSymbol"
+                )
+                .innerHTML = `
+
+                    ${symbol}
+
+                    <small>
+                        ${name}
+                    </small>
+
+                `;
+
+
+            document
+                .getElementById(
+                    "pageHeading"
+                )
+                .textContent =
+                "Technical Analysis";
+
+
+            document
+                .getElementById(
+                    "pageSubheading"
+                )
+                .textContent =
+                `${symbol} — multi-timeframe analysis`;
+
+        }
+
+
+        /*
+        ================================================
+        NAVIGATION
+        ================================================
+        */
+
+        document
+            .querySelectorAll(
+                ".nav-item"
+            )
+            .forEach(
+                item => {
+
+                    item.addEventListener(
+                        "click",
+                        function () {
+
+                            document
+                                .querySelectorAll(
+                                    ".page"
+                                )
+                                .forEach(
+                                    page =>
+                                        page
+                                            .classList
+                                            .remove(
+                                                "active"
+                                            )
+                                );
+
+
+                            const page =
+                                document
+                                    .getElementById(
+                                        item
+                                            .dataset
+                                            .page
+                                    );
+
+
+                            if (page) {
+
+                                page
+                                    .classList
+                                    .add(
+                                        "active"
+                                    );
+
+                            }
+
+
+                            document
+                                .querySelectorAll(
+                                    ".nav-item"
+                                )
+                                .forEach(
+                                    nav =>
+                                        nav
+                                            .classList
+                                            .remove(
+                                                "active"
+                                            )
+                                );
+
+
+                            item
+                                .classList
+                                .add(
+                                    "active"
+                                );
+
+
+                            document
+                                .getElementById(
+                                    "pageHeading"
+                                )
+                                .textContent =
+                                item
+                                    .textContent
+                                    .trim();
+
+
+                            document
+                                .getElementById(
+                                    "pageSubheading"
+                                )
+                                .textContent =
+                                "Aureus Intelligence System";
+
+                        }
+                    );
+
+                }
+            );
+
+
+        /*
+        ================================================
+        SCANNER
+        ================================================
+        */
+
+        document
+            .getElementById(
+                "runScan"
+            )
+            ?.addEventListener(
+                "click",
+                function () {
+
+                    const results =
+                        document
+                            .getElementById(
+                                "scanResults"
+                            );
+
+
+                    results.innerHTML =
+                        "";
+
+
+                    markets.forEach(
+                        market => {
+
+                            const score =
+                                Math.floor(
+                                    Math.random()
+                                    * 101
+                                );
+
+
+                            const bias =
+                                score >= 70
+                                    ? "BULLISH"
+                                    : score <= 30
+                                        ? "BEARISH"
+                                        : "NEUTRAL";
+
+
+                            const row =
+                                document
+                                    .createElement(
+                                        "div"
+                                    );
+
+
+                            row.className =
+                                "scan-row";
+
+
+                            row.innerHTML = `
+
+                                <span>
+                                    ${market[0]}
+                                </span>
+
+                                <span>
+                                    ${bias}
+                                </span>
+
+                                <strong>
+                                    ${score}/100
+                                </strong>
+
+                            `;
+
+
+                            row.onclick =
+                                () =>
+                                    selectMarket(
+                                        market[0],
+                                        market[1]
+                                    );
+
+
+                            results
+                                .appendChild(
+                                    row
+                                );
+
+                        }
+                    );
+
+                }
+            );
+
+
+        /*
+        ================================================
+        REFRESH
+        ================================================
+        */
+
+        document
+            .getElementById(
+                "refreshData"
+            )
+            ?.addEventListener(
+                "click",
+                function () {
+
+                    alert(
+                        "Aureus data refresh will activate once the market-data provider is connected."
+                    );
+
+                }
+            );
+
+
+        /*
+        ================================================
+        BACKTEST BUTTON
+        ================================================
+        */
+
+        document
+            .getElementById(
+                "runBacktest"
+            )
+            ?.addEventListener(
+                "click",
+                function () {
+
+                    alert(
+                        "Backtest engine is ready. Historical market data is the remaining input."
+                    );
+
+                }
+            );
+
+
+        /*
+        ================================================
+        TIMEFRAMES
+        ================================================
+        */
+
+        document
+            .querySelectorAll(
+                ".timeframe"
+            )
+            .forEach(
+                button => {
+
+                    button.addEventListener(
+                        "click",
+                        function () {
+
+                            document
+                                .querySelectorAll(
+                                    ".timeframe"
+                                )
+                                .forEach(
+                                    b =>
+                                        b.classList
+                                            .remove(
+                                                "active"
+                                            )
+                                );
+
+
+                            button
+                                .classList
+                                .add(
+                                    "active"
+                                );
+
+
+                            document
+                                .getElementById(
+                                    "analysisTimeframe"
+                                )
+                                .textContent =
+                                button
+                                    .dataset
+                                    .timeframe;
+
+                        }
+                    );
+
+                }
+            );
+
+    }
+);
+
+</script>
 
 
 </body>
-
 </html>
