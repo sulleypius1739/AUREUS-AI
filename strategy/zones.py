@@ -4,28 +4,46 @@ import pandas as pd
 class ZoneAnalyzer:
 
     def __init__(self, fvg_min_size=0.0):
+
         self.fvg_min_size = fvg_min_size
+
+    # =========================================================
+    # PREPARE COLUMNS
+    # =========================================================
 
     def add_columns(self, df):
 
         df = df.copy()
 
         columns = [
+
             "support",
             "resistance",
+
             "demand",
             "supply",
+
             "bullish_order_block",
             "bearish_order_block",
+
             "bullish_fvg",
             "bearish_fvg",
+
             "displacement"
+
         ]
 
         for column in columns:
-            df[column] = False
+
+            if column not in df.columns:
+
+                df[column] = False
 
         return df
+
+    # =========================================================
+    # SUPPORT AND RESISTANCE
+    # =========================================================
 
     def detect_support_resistance(self, df):
 
@@ -33,27 +51,49 @@ class ZoneAnalyzer:
 
         for i in range(1, len(df) - 1):
 
-            if (
-                df.iloc[i]["low"] < df.iloc[i-1]["low"]
-                and
-                df.iloc[i]["low"] < df.iloc[i+1]["low"]
-            ):
-                df.iloc[
-                    i,
-                    df.columns.get_loc("support")
-                ] = True
+            current_low = df.iloc[i]["low"]
+            previous_low = df.iloc[i - 1]["low"]
+            next_low = df.iloc[i + 1]["low"]
+
+            current_high = df.iloc[i]["high"]
+            previous_high = df.iloc[i - 1]["high"]
+            next_high = df.iloc[i + 1]["high"]
+
+            # -------------------------------------------------
+            # SUPPORT
+            # -------------------------------------------------
 
             if (
-                df.iloc[i]["high"] > df.iloc[i-1]["high"]
+                current_low < previous_low
                 and
-                df.iloc[i]["high"] > df.iloc[i+1]["high"]
+                current_low < next_low
             ):
-                df.iloc[
-                    i,
-                    df.columns.get_loc("resistance")
+
+                df.loc[
+                    df.index[i],
+                    "support"
+                ] = True
+
+            # -------------------------------------------------
+            # RESISTANCE
+            # -------------------------------------------------
+
+            if (
+                current_high > previous_high
+                and
+                current_high > next_high
+            ):
+
+                df.loc[
+                    df.index[i],
+                    "resistance"
                 ] = True
 
         return df
+
+    # =========================================================
+    # SUPPLY AND DEMAND
+    # =========================================================
 
     def detect_supply_demand(self, df):
 
@@ -61,40 +101,75 @@ class ZoneAnalyzer:
 
         for i in range(1, len(df)):
 
-            previous = df.iloc[i-1]
+            previous = df.iloc[i - 1]
             current = df.iloc[i]
 
             previous_bearish = (
-                previous["close"] < previous["open"]
+                previous["close"]
+                <
+                previous["open"]
             )
 
             previous_bullish = (
-                previous["close"] > previous["open"]
+                previous["close"]
+                >
+                previous["open"]
             )
 
             current_bullish = (
-                current["close"] > current["open"]
+                current["close"]
+                >
+                current["open"]
             )
 
             current_bearish = (
-                current["close"] < current["open"]
+                current["close"]
+                <
+                current["open"]
             )
 
-            if previous_bearish and current_bullish:
+            # -------------------------------------------------
+            # DEMAND
+            # -------------------------------------------------
+            #
+            # Bearish candle followed by bullish movement.
+            # This is a basic candidate definition.
+            #
+            # Later we will require displacement and
+            # structural confirmation.
+            # -------------------------------------------------
 
-                df.iloc[
-                    i-1,
-                    df.columns.get_loc("demand")
+            if (
+                previous_bearish
+                and
+                current_bullish
+            ):
+
+                df.loc[
+                    df.index[i - 1],
+                    "demand"
                 ] = True
 
-            if previous_bullish and current_bearish:
+            # -------------------------------------------------
+            # SUPPLY
+            # -------------------------------------------------
 
-                df.iloc[
-                    i-1,
-                    df.columns.get_loc("supply")
+            if (
+                previous_bullish
+                and
+                current_bearish
+            ):
+
+                df.loc[
+                    df.index[i - 1],
+                    "supply"
                 ] = True
 
         return df
+
+    # =========================================================
+    # ORDER BLOCKS
+    # =========================================================
 
     def detect_order_blocks(self, df):
 
@@ -102,44 +177,72 @@ class ZoneAnalyzer:
 
         for i in range(1, len(df)):
 
-            previous = df.iloc[i-1]
+            previous = df.iloc[i - 1]
             current = df.iloc[i]
 
             previous_bearish = (
-                previous["close"] < previous["open"]
+                previous["close"]
+                <
+                previous["open"]
             )
 
             previous_bullish = (
-                previous["close"] > previous["open"]
+                previous["close"]
+                >
+                previous["open"]
             )
 
-            bullish_move = (
-                current["close"] > previous["high"]
+            # -------------------------------------------------
+            # BULLISH ORDER BLOCK
+            # -------------------------------------------------
+            #
+            # Last bearish candle before bullish displacement
+            # through the previous high.
+            # -------------------------------------------------
+
+            bullish_displacement = (
+                current["close"]
+                >
+                previous["high"]
             )
 
-            bearish_move = (
-                current["close"] < previous["low"]
-            )
+            if (
+                previous_bearish
+                and
+                bullish_displacement
+            ):
 
-            if previous_bearish and bullish_move:
-
-                df.iloc[
-                    i-1,
-                    df.columns.get_loc(
-                        "bullish_order_block"
-                    )
+                df.loc[
+                    df.index[i - 1],
+                    "bullish_order_block"
                 ] = True
 
-            if previous_bullish and bearish_move:
+            # -------------------------------------------------
+            # BEARISH ORDER BLOCK
+            # -------------------------------------------------
 
-                df.iloc[
-                    i-1,
-                    df.columns.get_loc(
-                        "bearish_order_block"
-                    )
+            bearish_displacement = (
+                current["close"]
+                <
+                previous["low"]
+            )
+
+            if (
+                previous_bullish
+                and
+                bearish_displacement
+            ):
+
+                df.loc[
+                    df.index[i - 1],
+                    "bearish_order_block"
                 ] = True
 
         return df
+
+    # =========================================================
+    # FAIR VALUE GAPS
+    # =========================================================
 
     def detect_fvg(self, df):
 
@@ -147,52 +250,75 @@ class ZoneAnalyzer:
 
         for i in range(2, len(df)):
 
-            candle_1 = df.iloc[i-2]
-            candle_3 = df.iloc[i]
+            first = df.iloc[i - 2]
+            middle = df.iloc[i - 1]
+            third = df.iloc[i]
+
+            # -------------------------------------------------
+            # BULLISH FVG
+            # -------------------------------------------------
+            #
+            # Third candle low remains above first candle high.
+            #
+            #       First       Third
+            #         │           │
+            #       High         Low
+            #          \         /
+            #           \  GAP  /
+            #
+            # -------------------------------------------------
 
             bullish_gap = (
-                candle_1["high"] <
-                candle_3["low"]
-            )
-
-            bearish_gap = (
-                candle_1["low"] >
-                candle_3["high"]
+                third["low"]
+                >
+                first["high"]
             )
 
             if bullish_gap:
 
                 gap_size = (
-                    candle_3["low"]
-                    - candle_1["high"]
+                    third["low"]
+                    -
+                    first["high"]
                 )
 
                 if gap_size >= self.fvg_min_size:
 
-                    df.iloc[
-                        i,
-                        df.columns.get_loc(
-                            "bullish_fvg"
-                        )
+                    df.loc[
+                        df.index[i],
+                        "bullish_fvg"
                     ] = True
+
+            # -------------------------------------------------
+            # BEARISH FVG
+            # -------------------------------------------------
+
+            bearish_gap = (
+                third["high"]
+                <
+                first["low"]
+            )
 
             if bearish_gap:
 
                 gap_size = (
-                    candle_1["low"]
-                    - candle_3["high"]
+                    first["low"]
+                    -
+                    third["high"]
                 )
 
                 if gap_size >= self.fvg_min_size:
 
-                    df.iloc[
-                        i,
-                        df.columns.get_loc(
-                            "bearish_fvg"
-                        )
+                    df.loc[
+                        df.index[i],
+                        "bearish_fvg"
                     ] = True
 
         return df
+
+    # =========================================================
+    # DISPLACEMENT
+    # =========================================================
 
     def detect_displacement(self, df):
 
@@ -201,40 +327,62 @@ class ZoneAnalyzer:
         for i in range(1, len(df)):
 
             current = df.iloc[i]
+            previous = df.iloc[i - 1]
 
-            candle_range = (
-                current["high"] - current["low"]
+            current_range = (
+                current["high"]
+                -
+                current["low"]
             )
 
             previous_range = (
-                df.iloc[i-1]["high"]
+                previous["high"]
                 -
-                df.iloc[i-1]["low"]
+                previous["low"]
             )
 
+            if previous_range <= 0:
+
+                continue
+
+            # -------------------------------------------------
+            # Basic displacement definition:
+            #
+            # Current candle range >= 1.5 × previous range
+            #
+            # This will later be improved using ATR and
+            # directional body size.
+            # -------------------------------------------------
+
             if (
-                previous_range > 0
-                and
-                candle_range >= previous_range * 1.5
+                current_range
+                >=
+                previous_range * 1.5
             ):
 
-                df.iloc[
-                    i,
-                    df.columns.get_loc(
-                        "displacement"
-                    )
+                df.loc[
+                    df.index[i],
+                    "displacement"
                 ] = True
 
         return df
+
+    # =========================================================
+    # COMPLETE ZONE ANALYSIS
+    # =========================================================
 
     def analyze(self, df):
 
         df = self.add_columns(df)
 
         df = self.detect_support_resistance(df)
+
         df = self.detect_supply_demand(df)
+
         df = self.detect_order_blocks(df)
+
         df = self.detect_fvg(df)
+
         df = self.detect_displacement(df)
 
         return df
