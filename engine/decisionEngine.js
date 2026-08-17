@@ -318,7 +318,7 @@ function countConflicts(setup) {
 
     if (
         typeof setup.riskReward === "number" &&
-        setup.riskReward 
+        setup.riskReward <
         AUREUS_CONFIG.minimumRiskReward
     ) {
 
@@ -371,7 +371,7 @@ function determineSignal(
     */
 
     if (
-        score 
+        score <
         60
     ) {
 
@@ -384,7 +384,7 @@ function determineSignal(
     */
 
     if (
-        score 
+        score <
         AUREUS_CONFIG.minimumValidScore
     ) {
 

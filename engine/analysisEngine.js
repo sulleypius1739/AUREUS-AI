@@ -48,27 +48,27 @@ the backtester.
 
 const technicalEngine =
     typeof require !== "undefined"
-        ? require("./technicalEngine")
+        ? require("../technicalEngine")
         : null;
 
 const structureBreakEngine =
     typeof require !== "undefined"
-        ? require("./structureBreakEngine")
+        ? require("../structureBreakEngine")
         : null;
 
 const liquidityEngine =
     typeof require !== "undefined"
-        ? require("./liquidityEngine")
+        ? require("../liquidityEngine")
         : null;
 
 const orderBlockEngine =
     typeof require !== "undefined"
-        ? require("./orderBlockEngine")
+        ? require("../orderBlockEngine")
         : null;
 
 const riskEngine =
     typeof require !== "undefined"
-        ? require("./riskEngine")
+        ? require("../riskEngine")
         : null;
 
 

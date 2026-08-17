@@ -1,247 +1,54 @@
+import math
+
+
 class RiskManager:
+    """Risk calculations for causal backtesting."""
 
-    def __init__(
-        self,
-        risk_percent=1.0,
-        minimum_rr=2.0,
-        stop_buffer_atr=0.15,
-        atr_lookback=14,
-        structural_lookback=20
-    ):
+    def __init__(self, risk_percent=1.0, minimum_rr=2.0, stop_buffer=2.0):
+        self.risk_percent = float(risk_percent)
+        self.minimum_rr = float(minimum_rr)
+        self.stop_buffer = float(stop_buffer)
+        if self.risk_percent <= 0:
+            raise ValueError("risk_percent must be > 0")
+        if self.minimum_rr <= 0:
+            raise ValueError("minimum_rr must be > 0")
+        if self.stop_buffer < 0:
+            raise ValueError("stop_buffer must be >= 0")
 
-        self.risk_percent = risk_percent
-        self.minimum_rr = minimum_rr
-        self.stop_buffer_atr = stop_buffer_atr
-        self.atr_lookback = atr_lookback
-        self.structural_lookback = structural_lookback
+    def calculate_position_size(self, balance, entry, stop):
+        risk_amount = float(balance) * self.risk_percent / 100.0
+        distance = abs(float(entry) - float(stop))
+        if distance <= 0:
+            return 0.0
+        size = risk_amount / distance
+        return float(size) if math.isfinite(size) else 0.0
 
-    def calculate_position_size(
-        self,
-        balance,
-        entry,
-        stop
-    ):
+    def calculate_rr(self, entry, stop, target):
+        risk = abs(float(entry) - float(stop))
+        reward = abs(float(target) - float(entry))
+        if risk <= 0:
+            return 0.0
+        return float(reward / risk)
 
-        risk_amount = (
-            balance
-            *
-            self.risk_percent
-            /
-            100
-        )
-
-        distance = abs(entry - stop)
-
-        if distance == 0:
-            return 0
-
-        return risk_amount / distance
-
-    # =========================================================
-    # ATR
-    # =========================================================
-
-    def calculate_atr(
-        self,
-        df,
-        index,
-        lookback=None
-    ):
-
-        lookback = lookback or self.atr_lookback
-
-        start = max(1, index - lookback + 1)
-
-        if start >= index + 1:
-            return None
-
-        highs = df["high"].to_numpy()
-        lows = df["low"].to_numpy()
-        closes = df["close"].to_numpy()
-
-        true_ranges = []
-
-        for i in range(start, index + 1):
-
-            tr = max(
-                highs[i] - lows[i],
-                abs(highs[i] - closes[i - 1]),
-                abs(lows[i] - closes[i - 1])
-            )
-
-            true_ranges.append(tr)
-
-        if not true_ranges:
-            return None
-
-        return sum(true_ranges) / len(true_ranges)
-
-    # =========================================================
-    # STRUCTURAL STOP LOSS
-    # =========================================================
-    #
-    # UPDATED to use the CONFIRMED columns from zones.py /
-    # market_structure.py — bullish_order_block /
-    # bearish_order_block are now confirmation-indexed (see
-    # zones.py), and swing_low_confirmed / swing_high_confirmed
-    # (see market_structure.py) are confirmation-indexed too.
-    # Using the old raw swing_high/swing_low columns here would
-    # have silently reintroduced look-ahead into stop placement.
-    # =========================================================
-
-    def find_structural_stop(
-        self,
-        df,
-        index,
-        direction,
-        lookback=None
-    ):
-
-        lookback = lookback or self.structural_lookback
-
-        atr = self.calculate_atr(df, index)
-
-        buffer = (
-            atr * self.stop_buffer_atr
-            if atr
-            else 0
-        )
-
-        start = max(0, index - lookback)
-
-        if direction == "bullish":
-
-            ob_column = "bullish_order_block"
-            ob_level_column = "bullish_order_block_level"
-            swing_column = "swing_low_confirmed"
-            swing_level_column = "swing_low_price"
-            price_column = "low"
-
-        elif direction == "bearish":
-
-            ob_column = "bearish_order_block"
-            ob_level_column = "bearish_order_block_level"
-            swing_column = "swing_high_confirmed"
-            swing_level_column = "swing_high_price"
-            price_column = "high"
-
-        else:
-
-            return float(df.iloc[index]["low"])
-
-        # -----------------------------------------------------
-        # 1. Most recent CONFIRMED order block in range
-        # -----------------------------------------------------
-
-        for i in range(index - 1, start - 1, -1):
-
-            if bool(df.iloc[i].get(ob_column, False)):
-
-                level = df.iloc[i].get(ob_level_column)
-
-                if level is not None and level == level:  # not NaN
-
-                    level = float(level)
-
-                    return (
-                        level - buffer
-                        if direction == "bullish"
-                        else level + buffer
-                    )
-
-        # -----------------------------------------------------
-        # 2. Most recent CONFIRMED swing point in range
-        # -----------------------------------------------------
-
-        for i in range(index - 1, start - 1, -1):
-
-            if bool(df.iloc[i].get(swing_column, False)):
-
-                level = df.iloc[i].get(swing_level_column)
-
-                if level is not None and level == level:  # not NaN
-
-                    level = float(level)
-
-                    return (
-                        level - buffer
-                        if direction == "bullish"
-                        else level + buffer
-                    )
-
-        # -----------------------------------------------------
-        # 3. Fallback — current candle's own low/high
-        # -----------------------------------------------------
-
-        level = float(df.iloc[index][price_column])
-
-        return (
-            level - buffer
-            if direction == "bullish"
-            else level + buffer
-        )
-
-    def calculate_target(
-        self,
-        entry,
-        stop,
-        direction
-    ):
-
-        risk = abs(entry - stop)
-
-        reward = (
-            risk * self.minimum_rr
-        )
-
-        if direction == "bullish":
-
-            return entry + reward
-
-        if direction == "bearish":
-
-            return entry - reward
-
-        return None
-
-    def validate_trade(
-        self,
-        entry,
-        stop,
-        target,
-        direction
-    ):
-
-        risk = abs(entry - stop)
-
-        reward = abs(target - entry)
-
-        if risk == 0:
+    def validate_trade(self, entry, stop, target, direction):
+        if target is None:
             return False
-
+        risk = abs(float(entry) - float(stop))
+        reward = abs(float(target) - float(entry))
+        if risk <= 0:
+            return False
         rr = reward / risk
-
-        if rr < self.minimum_rr:
+        if rr + 1e-12 < self.minimum_rr:
             return False
-
         if direction == "bullish":
+            return stop < entry and target > entry
+        if direction == "bearish":
+            return stop > entry and target < entry
+        return False
 
-            if stop >= entry:
-                return False
-
-            if target <= entry:
-                return False
-
-        elif direction == "bearish":
-
-            if stop <= entry:
-                return False
-
-            if target >= entry:
-                return False
-
-        else:
-
-            return False
-
-        return True
+    def buffer_stop(self, price, direction):
+        if direction == "bullish":
+            return float(price) - self.stop_buffer
+        if direction == "bearish":
+            return float(price) + self.stop_buffer
+        raise ValueError("direction must be bullish or bearish")

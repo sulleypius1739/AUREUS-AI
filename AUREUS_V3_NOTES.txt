@@ -1,0 +1,38 @@
+AUREUS V3 — TRUE TOP-DOWN MTF REBUILD
+
+What changed
+-------------
+1. AUREUS now expects M5 historical candles as the base backtest data.
+2. It derives 10M, 15M, 1H, 4H and Daily bars causally from that M5 stream.
+3. Daily: macro directional bias.
+4. 4H: directional confirmation and higher-timeframe context.
+5. 1H: setup/POI/order-block context.
+6. 15M and 10M: entry confirmation.
+7. M5: execution clock; entries occur at the next M5 open after a confirmed 10M/15M signal.
+8. Targets are structural/liquidity levels rather than a blind fixed 2R price.
+9. Premium/discount is evaluated from the 1H structural range.
+10. Lower timeframes may retrace against the higher-timeframe direction; they do not automatically reverse the macro bias.
+
+IMPORTANT DATA LIMITATION
+-------------------------
+The old EURUSDh1.csv cannot faithfully backtest this version. It is retained only as legacy/reference data. A genuine M5 history is required to evaluate the Daily -> 4H -> 1H -> 15M/10M strategy.
+
+LIVE DATA PLATFORM
+------------------
+The web platform now includes a Twelve Data connector. The user must enter their own API key in the Live Data panel. The key is stored only in browser localStorage and is not committed to Git.
+
+The platform can:
+- receive real-time prices over Twelve Data WebSocket when the account/plan permits it;
+- fall back to REST latest-price polling if WebSocket access is unavailable;
+- fetch Daily, 4H, 1H, 15M and 5M candles;
+- derive 10M candles from 5M data;
+- show a live top-down snapshot for EURUSD, GBPUSD, XAUUSD, USDJPY, AUDUSD and USDCAD.
+
+This connector is data/analysis only. It does not place trades.
+
+Suggested data workflow
+-----------------------
+For historical testing, obtain long M5 CSVs for the instruments you want to test and place them in data/.
+For live analysis, open index.html, enter a Twelve Data API key, connect, and choose an instrument.
+
+Do not treat a live 'BUY WATCH' or 'SELL WATCH' state as an automatic trading instruction. Confirm broker pricing, spread, execution, news conditions and the actual lower-timeframe chart before entering.

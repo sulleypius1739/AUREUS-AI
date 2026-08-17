@@ -1,0 +1,10 @@
+AUREUS FIXED PROJECT
+
+Python compile: PASS
+JavaScript syntax: PASS
+EUR/USD H1 backtest: PASS
+
+Validated data: 57,600 EUR/USD H1 candles
+Clean baseline after causal cleanup: 627 closed trades, 31.42% win rate, PF 0.92, -36R, max drawdown 68R.
+
+This is a clean engineering baseline, not the final optimized strategy. The next stage is strategy research/optimization.

@@ -1,430 +1,160 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 
 class LiquidityAnalyzer:
+    """
+    AUREUS V2 liquidity map.
+
+    Focuses on practical, objective liquidity:
+      - equal highs/lows from confirmed swings
+      - confirmed swing liquidity
+      - first clean sweep/reclaim event
+
+    All liquidity becomes available only after the underlying swing is
+    confirmed. Sweeps use the current candle's wick and close.
+    """
 
     def __init__(
         self,
         swing_lookback=3,
-        equal_tolerance=0.0002
+        equal_tolerance=20.0,
+        minimum_separation=3,
+        liquidity_expiry=120,
     ):
-
-        if swing_lookback < 1:
-            raise ValueError(
-                "swing_lookback must be >= 1"
-            )
-
-        if equal_tolerance < 0:
-            raise ValueError(
-                "equal_tolerance must be >= 0"
-            )
-
-        self.swing_lookback = int(
-            swing_lookback
-        )
-
-        self.equal_tolerance = float(
-            equal_tolerance
-        )
-
-    # =========================================================
-    # PREPARE COLUMNS
-    # =========================================================
+        self.swing_lookback = int(swing_lookback)
+        self.equal_tolerance = float(equal_tolerance)
+        self.minimum_separation = int(minimum_separation)
+        self.liquidity_expiry = int(liquidity_expiry)
+        if self.swing_lookback < 1:
+            raise ValueError("swing_lookback must be >= 1")
+        if self.minimum_separation < 1:
+            raise ValueError("minimum_separation must be >= 1")
 
     def add_columns(self, df):
-
         df = df.copy()
-
-        columns = [
-            "equal_high",
-            "equal_low",
-            "buy_side_liquidity",
-            "sell_side_liquidity",
-            "buy_side_sweep",
-            "sell_side_sweep"
+        bool_cols = [
+            "equal_high", "equal_low",
+            "buy_side_liquidity", "sell_side_liquidity",
+            "buy_side_sweep", "sell_side_sweep",
+            "buy_side_sweep_reclaim", "sell_side_sweep_reclaim",
         ]
-
-        for column in columns:
-
-            if column not in df.columns:
-
-                df[column] = False
-
+        float_cols = [
+            "equal_high_level", "equal_low_level",
+            "buy_side_sweep_level", "sell_side_sweep_level",
+        ]
+        for c in bool_cols:
+            if c not in df.columns:
+                df[c] = False
+        for c in float_cols:
+            if c not in df.columns:
+                df[c] = np.nan
         return df
 
-    # =========================================================
-    # EQUAL HIGHS
-    # =========================================================
+    def _confirmed_prices(self, df, side):
+        if side == "high":
+            flag = "confirmed_swing_high"
+            price = "swing_high_price"
+        else:
+            flag = "confirmed_swing_low"
+            price = "swing_low_price"
+        if flag not in df.columns:
+            raise ValueError("LiquidityAnalyzer requires MarketStructure confirmation columns")
+        return df[flag].to_numpy(dtype=bool), df[price].to_numpy(dtype=float)
 
-    def find_equal_highs(self, df):
+    def _equal_levels(self, df, side):
+        flags, prices = self._confirmed_prices(df, side)
+        n = len(df)
+        equal = np.zeros(n, dtype=bool)
+        levels = np.full(n, np.nan)
+        previous = []
 
-        df = df.copy()
+        for i in range(n):
+            previous = [x for x in previous if i - x[0] <= self.liquidity_expiry]
+            if not flags[i] or not np.isfinite(prices[i]):
+                continue
+            current = float(prices[i])
+            match = None
+            for j, prev_price in reversed(previous):
+                if i - j < self.minimum_separation:
+                    continue
+                if abs(current - prev_price) <= self.equal_tolerance:
+                    match = (current + prev_price) / 2.0
+                    break
+            if match is not None:
+                equal[i] = True
+                levels[i] = match
+            previous.append((i, current))
 
-        highs = df["high"].to_numpy(
-            dtype=float
-        )
+        return equal, levels
 
-        length = len(df)
+    def _sweep(self, df, side, equal_flag, equal_level):
+        n = len(df)
+        sweeps = np.zeros(n, dtype=bool)
+        sweep_level = np.full(n, np.nan)
+        active = []
 
-        equal_high = np.zeros(
-            length,
-            dtype=bool
-        )
+        highs = df["high"].to_numpy(dtype=float)
+        lows = df["low"].to_numpy(dtype=float)
+        closes = df["close"].to_numpy(dtype=float)
 
-        lookback = self.swing_lookback
-        tolerance = self.equal_tolerance
+        candidate_col = "candidate_high" if side == "high" else "candidate_low"
+        if candidate_col in df.columns:
+            candidate = df[candidate_col].to_numpy(dtype=float)
+        else:
+            _, candidate = self._confirmed_prices(df, side)
 
-        for i in range(
-            lookback,
-            length
-        ):
+        last_candidate = np.nan
 
-            current_high = highs[i]
+        for i in range(n):
+            # Equal liquidity gets priority. Otherwise the latest known
+            # structure level is available liquidity.
+            if equal_flag[i] and np.isfinite(equal_level[i]):
+                last_candidate = float(equal_level[i])
+                active.append({"created_at": i, "level": last_candidate})
+            elif np.isfinite(candidate[i]) and (not np.isfinite(last_candidate) or float(candidate[i]) != last_candidate):
+                last_candidate = float(candidate[i])
+                active.append({"created_at": i, "level": last_candidate})
 
-            previous_highs = highs[
-                i - lookback:i
+            active = [
+                p for p in active
+                if i - p["created_at"] <= self.liquidity_expiry
             ]
 
-            difference = np.abs(
-                previous_highs
-                -
-                current_high
-            )
-
-            relative_difference = (
-                difference
-                /
-                np.maximum(
-                    np.abs(current_high),
-                    1e-12
-                )
-            )
-
-            if np.any(
-                relative_difference
-                <=
-                tolerance
-            ):
-
-                equal_high[i] = True
-
-        df["equal_high"] = (
-            equal_high
-        )
-
-        return df
-
-    # =========================================================
-    # EQUAL LOWS
-    # =========================================================
-
-    def find_equal_lows(self, df):
-
-        df = df.copy()
-
-        lows = df["low"].to_numpy(
-            dtype=float
-        )
-
-        length = len(df)
-
-        equal_low = np.zeros(
-            length,
-            dtype=bool
-        )
-
-        lookback = self.swing_lookback
-        tolerance = self.equal_tolerance
-
-        for i in range(
-            lookback,
-            length
-        ):
-
-            current_low = lows[i]
-
-            previous_lows = lows[
-                i - lookback:i
-            ]
-
-            difference = np.abs(
-                previous_lows
-                -
-                current_low
-            )
-
-            relative_difference = (
-                difference
-                /
-                np.maximum(
-                    np.abs(current_low),
-                    1e-12
-                )
-            )
-
-            if np.any(
-                relative_difference
-                <=
-                tolerance
-            ):
-
-                equal_low[i] = True
-
-        df["equal_low"] = (
-            equal_low
-        )
-
-        return df
-
-    # =========================================================
-    # BUY-SIDE LIQUIDITY
-    # =========================================================
-
-    def identify_buy_side_liquidity(
-        self,
-        df
-    ):
-
-        df = df.copy()
-
-        df["buy_side_liquidity"] = (
-            df["equal_high"]
-        )
-
-        return df
-
-    # =========================================================
-    # SELL-SIDE LIQUIDITY
-    # =========================================================
-
-    def identify_sell_side_liquidity(
-        self,
-        df
-    ):
-
-        df = df.copy()
-
-        df["sell_side_liquidity"] = (
-            df["equal_low"]
-        )
-
-        return df
-
-    # =========================================================
-    # BUY-SIDE LIQUIDITY SWEEP
-    # =========================================================
-    #
-    # A buy-side sweep occurs when:
-    #
-    # 1. Price has established buy-side liquidity.
-    # 2. Price trades ABOVE that liquidity.
-    # 3. Price CLOSES BACK BELOW that liquidity.
-    #
-    # This avoids treating a simple breakout as a sweep.
-    # =========================================================
-
-    def detect_buy_side_sweeps(
-        self,
-        df
-    ):
-
-        df = df.copy()
-
-        highs = df["high"].to_numpy(
-            dtype=float
-        )
-
-        closes = df["close"].to_numpy(
-            dtype=float
-        )
-
-        equal_highs = df[
-            "equal_high"
-        ].to_numpy(
-            dtype=bool
-        )
-
-        sweeps = np.zeros(
-            len(df),
-            dtype=bool
-        )
-
-        last_liquidity_high = None
-
-        for i in range(len(df)):
-
-            # -------------------------------------------------
-            # Establish / update liquidity
-            # -------------------------------------------------
-
-            if equal_highs[i]:
-
-                last_liquidity_high = (
-                    highs[i]
-                )
-
-                continue
-
-            # -------------------------------------------------
-            # Detect sweep
-            # -------------------------------------------------
-
-            if (
-                last_liquidity_high
-                is not None
-            ):
-
-                swept_above = (
-                    highs[i]
-                    >
-                    last_liquidity_high
-                )
-
-                closed_back_below = (
-                    closes[i]
-                    <
-                    last_liquidity_high
-                )
-
-                if (
-                    swept_above
-                    and
-                    closed_back_below
-                ):
-
+            for p in list(active):
+                if i <= p["created_at"]:
+                    continue
+                level = p["level"]
+                if side == "high":
+                    qualifies = highs[i] > level and closes[i] < level
+                else:
+                    qualifies = lows[i] < level and closes[i] > level
+                if qualifies:
                     sweeps[i] = True
+                    sweep_level[i] = level
+                    active.remove(p)
+                    break
 
-                    # Liquidity has been consumed.
-                    last_liquidity_high = None
-
-        df[
-            "buy_side_sweep"
-        ] = sweeps
-
-        return df
-
-    # =========================================================
-    # SELL-SIDE LIQUIDITY SWEEPS
-    # =========================================================
-    #
-    # A sell-side sweep occurs when:
-    #
-    # 1. Price has established sell-side liquidity.
-    # 2. Price trades BELOW that liquidity.
-    # 3. Price CLOSES BACK ABOVE that liquidity.
-    #
-    # This avoids treating a simple breakdown as a sweep.
-    # =========================================================
-
-    def detect_sell_side_sweeps(
-        self,
-        df
-    ):
-
-        df = df.copy()
-
-        lows = df["low"].to_numpy(
-            dtype=float
-        )
-
-        closes = df["close"].to_numpy(
-            dtype=float
-        )
-
-        equal_lows = df[
-            "equal_low"
-        ].to_numpy(
-            dtype=bool
-        )
-
-        sweeps = np.zeros(
-            len(df),
-            dtype=bool
-        )
-
-        last_liquidity_low = None
-
-        for i in range(len(df)):
-
-            # -------------------------------------------------
-            # Establish / update liquidity
-            # -------------------------------------------------
-
-            if equal_lows[i]:
-
-                last_liquidity_low = (
-                    lows[i]
-                )
-
-                continue
-
-            # -------------------------------------------------
-            # Detect sweep
-            # -------------------------------------------------
-
-            if (
-                last_liquidity_low
-                is not None
-            ):
-
-                swept_below = (
-                    lows[i]
-                    <
-                    last_liquidity_low
-                )
-
-                closed_back_above = (
-                    closes[i]
-                    >
-                    last_liquidity_low
-                )
-
-                if (
-                    swept_below
-                    and
-                    closed_back_above
-                ):
-
-                    sweeps[i] = True
-
-                    # Liquidity has been consumed.
-                    last_liquidity_low = None
-
-        df[
-            "sell_side_sweep"
-        ] = sweeps
-
-        return df
-
-    # =========================================================
-    # COMPLETE LIQUIDITY ANALYSIS
-    # =========================================================
+        return sweeps, sweep_level
 
     def analyze(self, df):
+        df = self.add_columns(df.copy())
+        high_eq, high_level = self._equal_levels(df, "high")
+        low_eq, low_level = self._equal_levels(df, "low")
 
-        df = df.copy()
+        buy_sweep, buy_level = self._sweep(df, "high", high_eq, high_level)
+        sell_sweep, sell_level = self._sweep(df, "low", low_eq, low_level)
 
-        df = self.add_columns(df)
-
-        df = self.find_equal_highs(df)
-
-        df = self.find_equal_lows(df)
-
-        df = self.identify_buy_side_liquidity(
-            df
-        )
-
-        df = self.identify_sell_side_liquidity(
-            df
-        )
-
-        df = self.detect_buy_side_sweeps(
-            df
-        )
-
-        df = self.detect_sell_side_sweeps(
-            df
-        )
-
+        df["equal_high"] = high_eq
+        df["equal_low"] = low_eq
+        df["equal_high_level"] = high_level
+        df["equal_low_level"] = low_level
+        df["buy_side_liquidity"] = high_eq
+        df["sell_side_liquidity"] = low_eq
+        df["buy_side_sweep"] = buy_sweep
+        df["sell_side_sweep"] = sell_sweep
+        df["buy_side_sweep_reclaim"] = buy_sweep
+        df["sell_side_sweep_reclaim"] = sell_sweep
+        df["buy_side_sweep_level"] = buy_level
+        df["sell_side_sweep_level"] = sell_level
         return df

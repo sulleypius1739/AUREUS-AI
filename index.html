@@ -611,14 +611,197 @@
                 display: none;
             }
         }
-    </style>
+    
+
+        /* ================= AUREUS LIVE COMMAND CENTER ================= */
+        .command-center {
+            margin-top: 20px;
+            background: linear-gradient(180deg, rgba(17,25,37,.96), rgba(10,15,23,.96));
+            border: 1px solid rgba(215,168,75,.16);
+            border-radius: 18px;
+            overflow: hidden;
+            box-shadow: 0 24px 70px rgba(0,0,0,.24);
+        }
+        .command-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+        .toolbar-left,.toolbar-right { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+        .live-pill { display:inline-flex; align-items:center; gap:7px; padding:7px 10px; border-radius:999px; background:rgba(53,212,154,.08); color:#9af0cf; font-size:10px; font-weight:800; letter-spacing:.7px; }
+        .live-pill .dot { width:7px; height:7px; border-radius:50%; background:var(--green); box-shadow:0 0 10px rgba(53,212,154,.6); }
+        .live-pill.offline { background:rgba(255,95,109,.08); color:#ff9ea7; }
+        .live-pill.offline .dot { background:var(--red); box-shadow:0 0 10px rgba(255,95,109,.6); }
+        .command-select,.api-input { background:#080e16; border:1px solid rgba(255,255,255,.09); color:#f8fafc; border-radius:9px; padding:9px 10px; min-width:112px; }
+        .api-input { min-width:220px; }
+        .mini-btn { border:1px solid rgba(255,255,255,.09); background:#0b111a; color:#e8edf5; padding:9px 11px; border-radius:9px; cursor:pointer; font-size:11px; font-weight:700; }
+        .mini-btn:hover { border-color:rgba(215,168,75,.45); color:var(--gold2); }
+        .tf-btns { display:flex; gap:5px; padding:4px; border:1px solid rgba(255,255,255,.07); border-radius:9px; background:#080e16; }
+        .tf-btn { border:0; background:transparent; color:#8f9aae; padding:6px 8px; border-radius:6px; cursor:pointer; font-size:10px; font-weight:800; }
+        .tf-btn.active { background:rgba(215,168,75,.15); color:var(--gold2); }
+        .command-body { display:grid; grid-template-columns:minmax(0,1.85fr) 360px; min-height:470px; }
+        .chart-shell { min-width:0; border-right:1px solid var(--border); background:#081018; }
+        .chart-head { padding:13px 16px; display:flex; justify-content:space-between; align-items:flex-end; gap:15px; border-bottom:1px solid var(--border); }
+        .chart-main-price { font-size:26px; font-weight:850; letter-spacing:-.8px; }
+        .chart-meta { color:var(--muted); font-size:10px; margin-top:3px; }
+        .chart-bias { font-size:10px; font-weight:900; padding:6px 9px; border-radius:8px; background:rgba(255,255,255,.04); }
+        .chart-canvas { height:380px; }
+        .chart-foot { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; padding:10px 12px; border-top:1px solid var(--border); }
+        .stat-chip { background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.05); border-radius:9px; padding:9px; }
+        .stat-chip span { display:block; color:#748093; font-size:9px; text-transform:uppercase; letter-spacing:.8px; }
+        .stat-chip strong { display:block; margin-top:4px; font-size:12px; }
+        .analysis-pane { padding:16px; background:linear-gradient(180deg, rgba(13,19,29,.98), rgba(9,14,22,.98)); }
+        .pane-title { font-size:12px; font-weight:850; letter-spacing:.6px; text-transform:uppercase; }
+        .pane-sub { color:var(--muted); font-size:10px; margin-top:4px; }
+        .mtf-stack { margin-top:14px; display:grid; gap:7px; }
+        .mtf-row { display:grid; grid-template-columns:46px 1fr auto; gap:8px; align-items:center; padding:9px 10px; border-radius:9px; background:rgba(255,255,255,.025); border:1px solid rgba(255,255,255,.05); }
+        .mtf-row .tf { font-size:10px; color:#7b879a; font-weight:900; }
+        .mtf-row .bias { font-size:11px; font-weight:800; }
+        .bias-bull { color:var(--green); } .bias-bear { color:var(--red); } .bias-neutral { color:var(--gold2); }
+        .mtf-row .state { font-size:9px; color:#8c97a9; text-transform:uppercase; font-weight:800; }
+        .decision-box { margin-top:12px; padding:12px; border-radius:11px; border:1px solid rgba(255,255,255,.06); background:rgba(255,255,255,.02); }
+        .decision-label { color:#78849a; font-size:9px; text-transform:uppercase; letter-spacing:1px; }
+        .decision-value { margin-top:5px; font-size:19px; font-weight:900; }
+        .decision-value.buy { color:var(--green); } .decision-value.sell { color:var(--red); } .decision-value.wait { color:var(--gold2); }
+        .evidence-list { margin-top:10px; display:grid; gap:6px; }
+        .evidence { font-size:10px; color:#b8c1cf; display:flex; justify-content:space-between; padding:7px 8px; border-radius:7px; background:rgba(255,255,255,.025); }
+        .evidence .yes { color:var(--green); font-weight:800; } .evidence .no { color:#7d8798; font-weight:800; }
+        .error-strip { margin-top:8px; color:#ff9ea7; font-size:10px; display:none; }
+        .quick-note { margin-top:12px; color:#778297; font-size:9px; line-height:1.55; }
+        @media(max-width:1150px){ .command-body{grid-template-columns:1fr;} .chart-shell{border-right:0;border-bottom:1px solid var(--border);} }
+        @media(max-width:700px){ .chart-foot{grid-template-columns:repeat(2,1fr);} .api-input{min-width:160px; width:100%;} .command-toolbar{align-items:stretch;} .toolbar-right{width:100%;} }
+
+
+
+        /* ================= AUTH / ACCOUNT ================= */
+        body:not(.authenticated) > .topbar,
+        body:not(.authenticated) > .app {
+            display: none !important;
+        }
+
+        .auth-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: grid;
+            place-items: center;
+            padding: 28px;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(215,168,75,.18), transparent 40%),
+                radial-gradient(circle at 15% 80%, rgba(91,156,255,.10), transparent 35%),
+                #050810;
+        }
+
+        body.authenticated .auth-screen { display: none; }
+
+        .auth-shell {
+            width: min(460px, 100%);
+            border: 1px solid rgba(215,168,75,.20);
+            border-radius: 22px;
+            padding: 28px;
+            background: rgba(13,19,29,.93);
+            box-shadow: 0 28px 90px rgba(0,0,0,.55);
+            backdrop-filter: blur(18px);
+        }
+
+        .auth-brand { display:flex; align-items:center; gap:12px; margin-bottom:24px; }
+        .auth-logo {
+            width:46px; height:46px; border-radius:14px; display:grid; place-items:center;
+            background:linear-gradient(135deg,var(--gold2),#8e6823); color:#111; font-weight:900;
+        }
+        .auth-title { font-size:22px; font-weight:800; }
+        .auth-subtitle { color:var(--muted); font-size:12px; margin-top:4px; }
+        .auth-tabs { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:18px; }
+        .auth-tab { border:1px solid var(--border); background:var(--panel2); color:var(--muted); padding:10px; border-radius:10px; cursor:pointer; }
+        .auth-tab.active { color:var(--gold2); border-color:rgba(215,168,75,.35); background:rgba(215,168,75,.08); }
+        .auth-form { display:grid; gap:12px; }
+        .auth-field label { display:block; color:#aeb9c8; font-size:11px; margin-bottom:6px; }
+        .auth-field input { width:100%; padding:12px 13px; border-radius:10px; border:1px solid var(--border); background:#0a1018; color:#fff; outline:none; }
+        .auth-field input:focus { border-color:rgba(215,168,75,.55); }
+        .auth-error { min-height:18px; color:var(--red); font-size:12px; }
+        .auth-note { margin-top:14px; color:#6f7c8e; font-size:11px; line-height:1.6; }
+        .account-pill { display:flex; align-items:center; gap:9px; margin-left:auto; }
+        .account-avatar { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; background:rgba(215,168,75,.15); border:1px solid rgba(215,168,75,.25); color:var(--gold2); font-weight:800; }
+        .account-meta { min-width:110px; }
+        .account-name { font-size:12px; font-weight:700; }
+        .role-badge { font-size:9px; color:var(--gold2); letter-spacing:.8px; text-transform:uppercase; }
+        .logout-btn { border:1px solid var(--border); background:var(--panel2); color:#c9d2de; padding:8px 10px; border-radius:9px; cursor:pointer; }
+        .admin-only { display:none !important; }
+        body.is-president .admin-only { display:flex !important; }
+        #admin { display:none; }
+        #admin.active { display:block; }
+        .admin-grid { display:grid; grid-template-columns:1.2fr .8fr; gap:18px; }
+        .user-table { width:100%; border-collapse:collapse; }
+        .user-table th,.user-table td { padding:10px 8px; border-bottom:1px solid var(--border); text-align:left; font-size:12px; }
+        .user-table th { color:#718095; text-transform:uppercase; font-size:9px; letter-spacing:1px; }
+        .user-status { font-size:10px; border-radius:20px; padding:4px 7px; }
+        .user-status.active { color:var(--green); background:rgba(53,212,154,.09); }
+        .user-status.disabled { color:var(--red); background:rgba(255,95,109,.09); }
+        .admin-card { border:1px solid var(--border); background:var(--panel); border-radius:14px; padding:18px; }
+        .admin-card h3 { margin-bottom:10px; }
+        .admin-form { display:grid; gap:10px; }
+        .admin-form input,.admin-form select { width:100%; padding:10px 11px; border-radius:9px; border:1px solid var(--border); background:#0a1018; color:#fff; }
+        .audit-line { padding:8px 0; border-bottom:1px solid var(--border); color:#98a4b5; font-size:11px; }
+        @media (max-width: 900px) { .account-meta { display:none; } .admin-grid { grid-template-columns:1fr; } }
+    
+/* ===== AUREUS UX REFRESH ===== */
+:root{--bg:#050912;--panel:#0b1220;--panel2:#101a2a;--gold:#d8ad57;--gold2:#f4d58b;--green:#41ddb0;--red:#ff6674;--blue:#6ba7ff;--muted:#8794a8}
+body{background:radial-gradient(circle at 85% -10%,rgba(216,173,87,.14),transparent 30%),radial-gradient(circle at 5% 35%,rgba(107,167,255,.07),transparent 28%),linear-gradient(180deg,#050912,#070d16)}
+.sidebar{padding:16px 10px;background:rgba(6,11,20,.96);border-right:1px solid rgba(255,255,255,.07)}
+.nav-btn{padding:11px 12px;border-radius:11px;margin-bottom:3px}.nav-btn.active{box-shadow:inset 3px 0 0 var(--gold)}
+.hero{padding:22px 24px;border-radius:18px;background:linear-gradient(120deg,rgba(216,173,87,.10),rgba(13,20,32,.88) 48%,rgba(17,29,44,.65))}
+.hero h1{font-size:28px}.hero p{font-size:12px;line-height:1.55}
+.dashboard-summary{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 14px}.summary-card{padding:14px 15px;border:1px solid rgba(255,255,255,.07);border-radius:14px;background:linear-gradient(180deg,rgba(15,24,38,.95),rgba(9,15,25,.95));}.summary-label{font-size:8px;text-transform:uppercase;letter-spacing:1px;color:#748197}.summary-value{font-size:18px;font-weight:900;margin-top:6px}.summary-copy{font-size:9px;color:#8a96a8;margin-top:4px;line-height:1.45}.summary-pill{display:inline-block;padding:4px 7px;border-radius:6px;font-size:8px;font-weight:900;margin-top:8px}.summary-pill.good{color:#8af0ca;background:rgba(65,221,176,.09)}.summary-pill.wait{color:#f4d58b;background:rgba(216,173,87,.09)}
+.command-center{margin-top:0;border-radius:18px}.command-body{min-height:500px}.chart-canvas{height:400px}.analysis-pane{padding:15px}
+.dashboard-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.dashboard-tool{border:1px solid rgba(255,255,255,.07);background:#0b1220;color:#dbe3ef;padding:7px 10px;border-radius:8px;font-size:9px;font-weight:800;cursor:pointer}.dashboard-tool:hover{border-color:rgba(216,173,87,.35);color:var(--gold2)}
+.sidebar-mini{margin-top:18px;padding:11px;border:1px solid rgba(255,255,255,.07);border-radius:12px;background:rgba(255,255,255,.02)}.sidebar-mini .label{font-size:8px;color:#6f7d93;text-transform:uppercase;letter-spacing:.8px}.sidebar-mini .value{font-size:10px;font-weight:800;margin-top:4px}.sidebar-mini .copy{font-size:8px;color:#748197;line-height:1.45;margin-top:3px}
+.mobile-nav{display:none;border:1px solid rgba(255,255,255,.08);background:#0b1220;color:#fff;width:34px;height:34px;border-radius:9px}.mobile-nav:hover{border-color:rgba(216,173,87,.35)}
+@media(max-width:1150px){.dashboard-summary{grid-template-columns:1fr}.mobile-nav{display:grid;place-items:center}.sidebar{position:fixed;left:-250px;top:70px;bottom:0;z-index:150;width:235px;transition:.2s}.sidebar.sidebar-open{left:0}.app{grid-template-columns:1fr}.sidebar-overlay{display:block!important;position:fixed;inset:70px 0 0 0;background:rgba(0,0,0,.4);z-index:120}}
+@media(max-width:700px){main{padding:14px}.hero h1{font-size:23px}.command-toolbar{padding:10px}.chart-canvas{height:320px}.account-meta{display:none}.brand-sub{display:none}}
+
+</style>
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+
 </head>
 
 <body>
 
+
+<div class="auth-screen" id="authScreen">
+    <div class="auth-shell">
+        <div class="auth-brand">
+            <div class="auth-logo">A</div>
+            <div>
+                <div class="auth-title">AUREUS AI</div>
+                <div class="auth-subtitle">SECURE MARKET INTELLIGENCE TERMINAL</div>
+            </div>
+        </div>
+
+        <div class="auth-tabs">
+            <button class="auth-tab active" data-auth-tab="login">Sign in</button>
+            <button class="auth-tab" data-auth-tab="register">Create account</button>
+        </div>
+
+        <form class="auth-form" id="loginForm">
+            <div class="auth-field"><label>Email</label><input id="loginEmail" type="email" autocomplete="username" required></div>
+            <div class="auth-field"><label>Password</label><input id="loginPassword" type="password" autocomplete="current-password" required></div>
+            <button class="btn btn-primary" type="submit">Sign in to AUREUS</button>
+            <div class="auth-error" id="loginError"></div>
+        </form>
+
+        <form class="auth-form" id="registerForm" style="display:none;">
+            <div class="auth-field"><label>Name</label><input id="registerName" autocomplete="name" required></div>
+            <div class="auth-field"><label>Email</label><input id="registerEmail" type="email" autocomplete="email" required></div>
+            <div class="auth-field"><label>Password</label><input id="registerPassword" type="password" autocomplete="new-password" minlength="10" required></div>
+            <button class="btn btn-primary" type="submit">Create account</button>
+            <div class="auth-error" id="registerError"></div>
+        </form>
+
+        <div class="auth-note">Access is controlled by the AUREUS account server. The first-run administrator is created by the server setup and is the only role allowed to manage users.</div>
+    </div>
+</div>
+
 <!-- ================= TOP BAR ================= -->
 
 <header class="topbar">
+
+    <button class="mobile-nav" id="mobileNavToggle" aria-label="Open navigation">☰</button>
 
     <div class="brand">
         <div class="logo">A</div>
@@ -632,6 +815,19 @@
     <div class="status">
         <span class="status-dot"></span>
         SYSTEM ONLINE
+    </div>
+
+    <div class="status" data-aureus-live-status>
+        Live data not connected
+    </div>
+
+    <div class="account-pill">
+        <div class="account-avatar" id="accountAvatar">P</div>
+        <div class="account-meta">
+            <div class="account-name" id="accountName">President</div>
+            <div class="role-badge" id="accountRole">PRESIDENT</div>
+        </div>
+        <button class="logout-btn" id="logoutButton">Logout</button>
     </div>
 
 </header>
@@ -674,6 +870,13 @@
             <span>News & Events</span>
         </button>
 
+        <div class="section-label admin-only">Administration</div>
+
+        <button class="nav-btn admin-only" data-page="admin" id="adminNavButton">
+            <span class="nav-icon">◆</span>
+            <span>Admin Console</span>
+        </button>
+
         <div class="section-label">Strategy</div>
 
         <button class="nav-btn" data-page="backtest">
@@ -698,7 +901,14 @@
             <span>Strategy Rules</span>
         </button>
 
+        <div class="sidebar-mini">
+            <div class="label">President workspace</div>
+            <div class="value">AUREUS V4 • A+ Market Mechanics</div>
+            <div class="copy">Daily → 4H → 1H → 15M / 10M. Lower timeframes refine entries.</div>
+        </div>
+
     </aside>
+<div class="sidebar-overlay" style="display:none"></div>
 
 
     <!-- ================= MAIN CONTENT ================= -->
@@ -718,7 +928,7 @@
                 </h1>
 
                 <p>
-                    AUREUS AI combines multi-timeframe technical analysis,
+                    AUREUS AI follows one mechanical A+ setup built from market mechanics,
                     market structure, liquidity, supply and demand,
                     fundamental bias and event risk into one research
                     framework.
@@ -736,6 +946,96 @@
 
             </div>
 
+
+
+            <div class="dashboard-summary">
+                <div class="summary-card"><div class="summary-label">Top-down alignment</div><div class="summary-value" id="summaryAlignment">Daily → 4H → 1H</div><div class="summary-copy">Macro direction comes first. Entry timeframes confirm and refine.</div><span class="summary-pill wait" id="summaryAlignmentPill">WAITING</span></div>
+                <div class="summary-card"><div class="summary-label">AUREUS signal center</div><div class="summary-value" id="summarySignal">WAIT</div><div class="summary-copy">4H direction → 1H fresh POI → 15M market shift → liquidity sweep → 10M entry confirmation.</div><span class="summary-pill wait" id="summarySignalPill">MONITORING</span></div>
+                <div class="summary-card"><div class="summary-label">Live data</div><div class="summary-value" id="summaryFeed">Offline</div><div class="summary-copy">Twelve Data prices and candles populate the chart and analysis layer.</div><span class="summary-pill wait" id="summaryFeedPill">CONNECT</span></div>
+            </div>
+            <div class="dashboard-tools">
+                <button class="dashboard-tool" onclick="goTo('markets')">Markets</button>
+                <button class="dashboard-tool" onclick="goTo('analysis')">AI Analysis</button>
+                <button class="dashboard-tool" onclick="goTo('backtest')">Backtest</button>
+                <button class="dashboard-tool" onclick="goTo('strategy')">Strategy Rules</button>
+            </div>
+
+            <div class="command-center" id="aureusCommandCenter">
+                <div class="command-toolbar">
+                    <div class="toolbar-left">
+                        <div class="live-pill offline" id="aureusLivePill"><span class="dot"></span><span id="aureusLivePillText">LIVE FEED OFFLINE</span></div>
+                        <select class="command-select" id="aureusLiveSymbol">
+                            <option value="EURUSD">EUR/USD</option>
+                            <option value="GBPUSD">GBP/USD</option>
+                            <option value="XAUUSD">XAU/USD</option>
+                            <option value="USDJPY">USD/JPY</option>
+                            <option value="AUDUSD">AUD/USD</option>
+                            <option value="USDCAD">USD/CAD</option>
+                        </select>
+                        <div class="tf-btns" id="aureusTfButtons">
+                            <button class="tf-btn" data-tf="5min">5M</button>
+                            <button class="tf-btn" data-tf="10min">10M</button>
+                            <button class="tf-btn active" data-tf="15min">15M</button>
+                            <button class="tf-btn" data-tf="1h">1H</button>
+                            <button class="tf-btn" data-tf="4h">4H</button>
+                            <button class="tf-btn" data-tf="1day">1D</button>
+                        </div>
+                    </div>
+                    <div class="toolbar-right">
+                        <input id="aureusApiKey" class="api-input" type="password" placeholder="Twelve Data API key">
+                        <button class="mini-btn" id="aureusSaveKey">Connect live data</button>
+                        <button class="mini-btn" id="aureusRefreshAnalysis">Refresh</button>
+                    </div>
+                </div>
+
+                <div class="command-body">
+                    <div class="chart-shell">
+                        <div class="chart-head">
+                            <div>
+                                <div class="pane-title" id="aureusChartSymbol">EUR/USD · 15M</div>
+                                <div class="chart-main-price" id="aureusChartPrice">—</div>
+                                <div class="chart-meta" id="aureusChartMeta">Connect a live data provider to stream real candles.</div>
+                            </div>
+                            <div class="chart-bias" id="aureusChartBias">WAIT</div>
+                        </div>
+                        <div class="chart-canvas" id="aureusChart"></div>
+                        <div class="chart-foot">
+                            <div class="stat-chip"><span>Daily</span><strong id="aureusDailyBias">—</strong></div>
+                            <div class="stat-chip"><span>4H</span><strong id="aureusH4Bias">—</strong></div>
+                            <div class="stat-chip"><span>1H</span><strong id="aureusH1Bias">—</strong></div>
+                            <div class="stat-chip"><span>Location</span><strong id="aureusLocation">—</strong></div>
+                        </div>
+                    </div>
+
+                    <aside class="analysis-pane">
+                        <div class="pane-title">Top-Down Decision Engine</div>
+                        <div class="pane-sub">Daily → 4H → 1H → 15M / 10M</div>
+
+                        <div class="mtf-stack">
+                            <div class="mtf-row"><span class="tf">1D</span><span id="mtfDaily" class="bias bias-neutral">WAIT</span><span class="state">Macro</span></div>
+                            <div class="mtf-row"><span class="tf">4H</span><span id="mtf4h" class="bias bias-neutral">WAIT</span><span class="state">Bias</span></div>
+                            <div class="mtf-row"><span class="tf">1H</span><span id="mtf1h" class="bias bias-neutral">WAIT</span><span class="state">Context</span></div>
+                            <div class="mtf-row"><span class="tf">15M</span><span id="mtf15m" class="bias bias-neutral">WAIT</span><span class="state">Entry</span></div>
+                            <div class="mtf-row"><span class="tf">10M</span><span id="mtf10m" class="bias bias-neutral">WAIT</span><span class="state">Trigger</span></div>
+                        </div>
+
+                        <div class="decision-box">
+                            <div class="decision-label">AUREUS state</div>
+                            <div class="decision-value wait" id="aureusDecision">WAITING FOR DATA</div>
+                        </div>
+
+                        <div class="evidence-list">
+                            <div class="evidence"><span>15M liquidity sweep</span><span id="evidenceSweep15" class="no">NO</span></div>
+                            <div class="evidence"><span>10M market shift</span><span id="evidenceSweep10" class="no">NO</span></div>
+                            <div class="evidence"><span>15M market shift</span><span id="evidenceConfirm15" class="no">NO</span></div>
+                            <div class="evidence"><span>10M entry confirmation</span><span id="evidenceConfirm10" class="no">NO</span></div>
+                        </div>
+
+                        <div class="quick-note">Analysis only. AUREUS does not place trades from the browser. Validate the strategy on historical and forward data before considering execution.</div>
+                        <div id="aureusLiveError" class="error-strip"></div>
+                    </aside>
+                </div>
+            </div>
 
             <div class="metrics">
 
@@ -1589,98 +1889,98 @@
 
                         <div class="check">
                             <span class="check-name">
-                                01 — Determine higher-timeframe bias
+                                01 — Determine 4H higher-timeframe direction
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                02 — Identify major market structure
+                                02 — Identify the fresh 1H high-priority POI
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                03 — Mark significant support/resistance
+                                03 — Wait for the 15M internal market shift
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                04 — Identify supply/demand zones
+                                04 — Wait for the 15M liquidity sweep
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                05 — Identify order blocks
+                                05 — Wait for the 10M same-direction market shift
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                06 — Identify fair value gaps
+                                06 — Require price to mitigate the 1H POI
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                07 — Identify nearby liquidity
+                                07 — Enter on the next M5 candle
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                08 — Wait for liquidity sweep
+                                08 — Use the 1H structural target
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                09 — Confirm lower-timeframe structure
+                                09 — Require minimum 2R planned reward/risk
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                10 — Confirm candlestick behaviour
+                                10 — One setup only; no extra entry models
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                11 — Evaluate fundamental bias
+                                11 — Daily is context only in V4
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                12 — Evaluate upcoming news/event risk
+                                12 — No news/session filters in V4
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                13 — Calculate entry, stop and target
+                                13 — Stop beyond the POI
                             </span>
                             <span class="small">RULE</span>
                         </div>
 
                         <div class="check">
                             <span class="check-name">
-                                14 — Validate risk/reward
+                                14 — Record the A+ setup and result
                             </span>
                             <span class="small">RULE</span>
                         </div>
@@ -1700,6 +2000,43 @@
 
         </section>
 
+
+
+        <!-- ================= ADMIN CONSOLE ================= -->
+        <section class="page" id="admin">
+            <div class="page-header">
+                <div>
+                    <div class="page-title">Admin Console</div>
+                    <div class="page-description">President-level administration for AUREUS users, access control and audit activity.</div>
+                </div>
+            </div>
+
+            <div class="admin-grid">
+                <div class="admin-card">
+                    <h3>Users</h3>
+                    <div id="adminUsersTable">Loading users…</div>
+                </div>
+                <div class="admin-card">
+                    <h3>Create user</h3>
+                    <form class="admin-form" id="createUserForm">
+                        <input id="newUserName" placeholder="Full name" required>
+                        <input id="newUserEmail" type="email" placeholder="Email" required>
+                        <input id="newUserPassword" type="password" placeholder="Temporary password" required>
+                        <select id="newUserRole">
+                            <option value="USER">USER</option>
+                            <option value="ANALYST">ANALYST</option>
+                            <option value="ADMIN">ADMIN</option>
+                        </select>
+                        <button class="btn btn-primary" type="submit">Create account</button>
+                        <div class="auth-error" id="adminFormError"></div>
+                    </form>
+                    <div style="margin-top:18px;">
+                        <h3>Recent audit</h3>
+                        <div id="adminAudit">Loading…</div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
     </main>
 
@@ -1806,6 +2143,35 @@
 
     });
 
+</script>
+
+    <script src="assets/auth.js"></script>
+    <script src="assets/chart.js"></script>
+    <script src="assets/liveData.js"></script>
+
+<script>
+(() => {
+  const toggle=document.getElementById('mobileNavToggle');
+  const sidebar=document.querySelector('.sidebar');
+  const overlay=document.querySelector('.sidebar-overlay');
+  const close=()=>{sidebar?.classList.remove('sidebar-open'); if(overlay) overlay.style.display='none';};
+  toggle?.addEventListener('click',()=>{sidebar?.classList.toggle('sidebar-open'); if(overlay) overlay.style.display=sidebar?.classList.contains('sidebar-open')?'block':'none';});
+  overlay?.addEventListener('click',close);
+  document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',close));
+  setInterval(()=>{
+    const signal=document.getElementById('aureusDecision')?.textContent?.trim()||'WAIT';
+    const d=document.getElementById('mtfDaily')?.textContent?.trim()||'WAIT';
+    const h4=document.getElementById('mtf4h')?.textContent?.trim()||'WAIT';
+    const h1=document.getElementById('mtf1h')?.textContent?.trim()||'WAIT';
+    const a=document.getElementById('summaryAlignment'); if(a) a.textContent=`${d} → ${h4} → ${h1}`;
+    const s=document.getElementById('summarySignal'); if(s) s.textContent=signal;
+    const live=document.getElementById('aureusLivePillText')?.textContent||'';
+    const online=!live.toLowerCase().includes('offline');
+    const f=document.getElementById('summaryFeed'); if(f) f.textContent=online?'Online':'Offline';
+    const fp=document.getElementById('summaryFeedPill'); if(fp){fp.textContent=online?'CONNECTED':'CONNECT';fp.className='summary-pill '+(online?'good':'wait');}
+    const sp=document.getElementById('summarySignalPill'); if(sp){sp.textContent=signal.includes('BUY')?'BUY WATCH':signal.includes('SELL')?'SELL WATCH':'MONITORING';sp.className='summary-pill '+(signal.includes('BUY')?'good':signal.includes('SELL')?'wait':'wait');}
+  },1000);
+})();
 </script>
 
 </body>

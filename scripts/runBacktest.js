@@ -35,7 +35,7 @@ if (!file) {
     );
 
     console.log(
-        "node scripts/runBacktest.js data/XAUUSD.json"
+        "node scripts/runBacktest.js data/EURUSDh1.csv"
     );
 
     process.exit(1);
@@ -56,13 +56,32 @@ if (
 }
 
 
-const candles =
-    JSON.parse(
-        fs.readFileSync(
-            file,
-            "utf8"
-        )
-    );
+const raw = fs.readFileSync(file, "utf8");
+let candles;
+
+if (file.toLowerCase().endsWith(".csv")) {
+
+    const lines = raw.trim().split(/\r?\n/);
+    const headers = lines.shift().split(",").map(x => x.trim());
+
+    candles = lines.map(line => {
+        const parts = line.split(",");
+        const row = {};
+        headers.forEach((h, i) => row[h] = parts[i]);
+        return {
+            open: Number(row.open ?? row.Open),
+            high: Number(row.high ?? row.High),
+            low: Number(row.low ?? row.Low),
+            close: Number(row.close ?? row.Close),
+            date: row.Date ?? row.date
+        };
+    });
+
+} else {
+
+    candles = JSON.parse(raw);
+
+}
 
 
 // ============================================================

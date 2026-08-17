@@ -1,0 +1,21 @@
+{
+  "scenario": "A+ bullish golden path",
+  "instrument": "SYNTH-EURUSD",
+  "timeframe_input": "M5",
+  "expected_sequence": [
+    "4H bullish direction",
+    "1H fresh bullish POI",
+    "15M internal bearish pullback",
+    "15M bullish market shift",
+    "15M sell-side liquidity sweep after shift",
+    "10M bullish market shift after sweep",
+    "M5 entry inside bullish POI"
+  ],
+  "expected_logic_timestamps": {
+    "h1_poi_confirmation": "2020-01-06T08:00:00Z",
+    "designed_15m_shift_window": "2020-01-06T06:00:00Z/2020-01-06T08:00:00Z",
+    "designed_15m_sweep_window": "2020-01-06T06:00:00Z/2020-01-06T08:00:00Z",
+    "designed_10m_shift_window": "2020-01-06T06:00:00Z/2020-01-06T08:00:00Z"
+  },
+  "purpose": "Golden-path synthetic data. Used to verify that AUREUS recognizes one intended A+ setup end-to-end before any real-market backtest."
+}

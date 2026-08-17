@@ -1,10 +1,10 @@
 {
-  "name": "aureus-ai",
-  "version": "0.1.0",
-  "description": "Aureus AI universal market analysis and backtesting system",
-  "main": "engine/analysisEngine.js",
+  "name": "aureus-ai-v4",
+  "version": "4.0.0",
+  "description": "AUREUS AI V4 — single A+ market mechanics strategy with live President dashboard",
+  "main": "server.js",
   "scripts": {
-    "backtest": "node scripts/runBacktest.js"
-  },
-  "private": true
+    "start": "node server.js",
+    "web": "node server.js"
+  }
 }

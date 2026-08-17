@@ -1,0 +1,27 @@
+AUREUS REAL DATA — QUICK SETUP
+
+1. Create a Twelve Data account and obtain your own API key.
+2. Open index.html in the browser.
+3. In the REAL MARKET DATA panel, enter your API key and click Connect.
+4. Select EUR/USD, GBP/USD, XAU/USD, USD/JPY, AUD/USD or USD/CAD.
+5. The panel will stream prices when WebSocket access is available; otherwise it will use REST latest-price polling.
+6. Top-Down refresh retrieves Daily, 4H, 1H, 15M and 5M candles and derives 10M from 5M.
+7. AUREUS shows a BUY WATCH / SELL WATCH / WAIT state as an analysis aid. It does not place trades.
+
+Historical M5 download without Node/npm:
+
+python scripts/download_twelvedata.py --api-key YOUR_KEY --symbol EUR/USD --interval 5min --output data/EURUSD_m5.csv --outputsize 5000
+
+Repeat for other markets, for example XAU/USD or GBP/USD. Provider plan limits determine how much history you can retrieve.
+
+V3 backtest:
+
+python -m backtest.runner
+
+Then enter the M5 CSV path, e.g.
+
+data\EURUSD_m5.csv
+
+The V3 backtester derives:
+Daily -> 4H -> 1H -> 15M -> 10M
+and executes on the next M5 open after an entry confirmation.

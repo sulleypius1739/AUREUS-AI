@@ -1,0 +1,23 @@
+AUREUS V3 — LIVE WEB UI UPDATE
+
+What changed:
+- Added an integrated dark/gold live command center to the dashboard.
+- Added interactive candlestick charting using Lightweight Charts loaded from CDN.
+- Added timeframe controls: 5M, 10M, 15M, 1H, 4H, 1D.
+- Added instrument selector: EUR/USD, GBP/USD, XAU/USD, USD/JPY, AUD/USD, USD/CAD.
+- Added Twelve Data API-key connection inside the main dashboard instead of a floating panel.
+- Added top-down display: Daily / 4H / 1H / 15M / 10M.
+- Added live decision state, sweep/confirmation evidence, premium/discount location, and chart metadata.
+- Added REST fallback if WebSocket streaming is unavailable on the user's provider plan.
+
+Live data setup:
+1. Open index.html in a browser (or serve the folder with a local static server).
+2. Enter your own Twelve Data API key into the dashboard.
+3. Click Connect live data.
+4. Select an instrument and timeframe.
+5. Use Refresh for a fresh top-down snapshot.
+
+Important:
+- The web UI is analysis-only and does not place trades.
+- The chart library is loaded from https://unpkg.com/lightweight-charts/.
+- The provider API key is stored in localStorage on the user's computer.

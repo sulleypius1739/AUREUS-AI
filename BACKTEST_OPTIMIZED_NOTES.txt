@@ -1,0 +1,44 @@
+AUREUS V3 FINAL CONSOLIDATED BUILD
+
+This build consolidates the course-based top-down strategy, the President/admin
+web dashboard, live Twelve Data connector, and the backtest performance fixes.
+
+TOP-DOWN MODEL
+Daily -> 4H -> 1H -> 15M/10M -> M5 execution
+
+PERFORMANCE FIXES
+- Robust Unix timestamp detection for Dukascopy M5 exports.
+- Vectorized candle confirmations (no DataFrame.iloc loop).
+- M5 is an execution clock and is not duplicated/analyzed as a full strategy frame.
+- Actionable signals are stored only by candle index; WAIT candles do not create
+  hundreds of thousands of Python Setup objects.
+- Backtest checks only one active trade at a time instead of scanning every
+  historical trade on every candle.
+- M5 OHLC is accessed through NumPy arrays during execution.
+- Long backtests print progress every 100,000 candles.
+
+LIVE WEB
+- Login/authentication layer.
+- President/admin console.
+- Live Twelve Data connector (analysis only, no order routing).
+- Interactive chart and timeframe controls.
+- Daily/4H/1H/15M/10M top-down display.
+
+RECOMMENDED FIRST TEST
+1. Compile:
+   python -m compileall strategy backtest scripts
+2. Run the 50k smoke test if needed.
+3. Run the full backtest:
+   python -m backtest.runner
+4. Enter:
+   data\EURUSD_m5.csv
+5. Watch the progress lines. Do not start a second backtest while one is running.
+
+WEB
+Start the authenticated web server with:
+   node server.js
+Then open:
+   http://localhost:8000
+
+Keep the Twelve Data API key out of GitHub. The browser connector currently stores
+it in localStorage on the local machine and performs analysis only.

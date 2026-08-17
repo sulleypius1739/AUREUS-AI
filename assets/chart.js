@@ -1,121 +1,56 @@
-/* =========================================================
-   AUREUS AI — CHART CONTROLLER
-   ========================================================= */
+/* AUREUS AI — Interactive chart layer */
+(() => {
+    "use strict";
 
-class AureusChart {
-
-    constructor(containerId) {
-
-        this.container =
-            document.getElementById(
-                containerId
-            );
-
-        this.chart = null;
-
-        this.series = null;
-
-    }
-
-
-    create() {
-
-        if (!this.container) {
-
-            console.warn(
-                "AUREUS chart container not found."
-            );
-
-            return;
-
+    class AureusChart {
+        constructor(containerId) {
+            this.container = document.getElementById(containerId);
+            this.chart = null;
+            this.series = null;
+            this.lastCandles = [];
+            this.activeTf = "15min";
         }
 
-
-        /*
-         * The real TradingView-style chart
-         * will be connected once we add
-         * the market-data provider.
-         *
-         * For now this creates the visual
-         * chart area without requiring
-         * paid market data.
-         */
-
-        this.container.innerHTML = `
-            <div class="chart-placeholder">
-
-                <div class="chart-placeholder-grid"></div>
-
-                <div class="chart-placeholder-content">
-
-                    <div class="chart-symbol">
-                        XAU/USD
-                    </div>
-
-                    <div class="chart-price">
-                        MARKET DATA OFFLINE
-                    </div>
-
-                    <p>
-                        Connect a market-data provider
-                        to display live candles.
-                    </p>
-
-                </div>
-
-            </div>
-        `;
-
-    }
-
-
-    setCandles(candles) {
-
-        if (!candles || !candles.length) {
-
-            return;
-
-        }
-
-
-        console.log(
-            "Candles received:",
-            candles.length
-        );
-
-    }
-
-
-    clear() {
-
-        if (this.container) {
-
+        create() {
+            if (!this.container || !window.LightweightCharts) return;
             this.container.innerHTML = "";
-
+            this.chart = LightweightCharts.createChart(this.container, {
+                layout: { background: { color: "#081018" }, textColor: "#8d99ab" },
+                grid: { vertLines: { color: "rgba(255,255,255,0.025)" }, horzLines: { color: "rgba(255,255,255,0.025)" } },
+                rightPriceScale: { borderColor: "rgba(255,255,255,0.08)" },
+                timeScale: { borderColor: "rgba(255,255,255,0.08)", timeVisible: true, secondsVisible: false },
+                crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+                handleScroll: true,
+                handleScale: true
+            });
+            this.series = this.chart.addCandlestickSeries({
+                upColor: "#35d49a",
+                downColor: "#ff5f6d",
+                borderVisible: false,
+                wickUpColor: "#35d49a",
+                wickDownColor: "#ff5f6d"
+            });
+            const resize = () => this.chart.resize(this.container.clientWidth, this.container.clientHeight);
+            window.addEventListener("resize", resize);
+            resize();
         }
 
+        setCandles(candles, timeframe = this.activeTf) {
+            if (!this.series || !Array.isArray(candles) || !candles.length) return;
+            this.activeTf = timeframe;
+            const clean = candles
+                .filter(c => Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close) && Number.isFinite(c.timestamp))
+                .map(c => ({ time: Math.floor(c.timestamp / 1000), open: c.open, high: c.high, low: c.low, close: c.close }))
+                .sort((a,b) => a.time - b.time);
+            this.lastCandles = clean;
+            this.series.setData(clean);
+            this.chart.timeScale().fitContent();
+        }
     }
 
-}
-
-
-/* ---------------------------------------------------------
-   INITIALIZE CHART
---------------------------------------------------------- */
-
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-
-        const chart =
-            new AureusChart(
-                "aureusChart"
-            );
-
+    document.addEventListener("DOMContentLoaded", () => {
+        const chart = new AureusChart("aureusChart");
         chart.create();
-
-        window.aureusChart =
-            chart;
-
-    }
-);
+        window.aureusChart = chart;
+    });
+})();

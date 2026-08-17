@@ -1,0 +1,32 @@
+AUREUS V2 - course-based rebuild
+
+What changed in the Python strategy stack:
+- External/internal market-structure model with causal confirmed swings.
+- Causal BOS and CHOCH flags using already-known structure levels.
+- Equal-high/equal-low liquidity pools and reclaim-style liquidity sweeps.
+- FVG detection using three-candle imbalance logic.
+- Order blocks require a directional impulse plus liquidity sweep context and structural confirmation.
+- POIs are modeled as single-candle sweep/reclaim zones confirmed by the following directional displacement.
+- Zone freshness and first-retest events are tracked; first touch consumes the fresh setup.
+- Premium/discount location is included as a location filter.
+- Confirmation layer adds engulfing/rejection and an H1 local displacement proxy because the current dataset is H1 only.
+- Backtester uses next-bar-open execution and conservative stop-first handling when stop and target are both inside one candle.
+- Targets prefer causal protected structural levels known at signal time; no future candle is used to choose the target.
+
+Important limitation:
+The course's true multi-timeframe execution model (for example 4H->15M or 1H->5M) cannot be reproduced from EURUSD H1-only data. AUREUS V2 therefore uses a same-timeframe confirmation proxy. Do not treat this as a perfect implementation of the course's lower-timeframe entry model.
+
+Validation:
+- strategy/*.py compiles with python -m py_compile
+- backtest/*.py compiles with python -m py_compile
+- Full EURUSD H1 backtest executes end-to-end.
+
+EURUSD H1 test with the bundled configuration:
+- 57,600 candles
+- 5 closed trades
+- 1 win / 4 losses
+- 20.00% win rate
+- 0.50 profit factor
+- -2R net
+
+This result is NOT being presented as a proven improvement. The rebuild is deliberately stricter and sequence-based; the next step is controlled validation and refinement, not curve-fitting to this one sample.

@@ -1,0 +1,19 @@
+AUREUS V4 GOLDEN SCENARIO FIX
+
+This patch does NOT replace the whole AUREUS project.
+Copy these files over the matching project files.
+
+Verified result:
+[PASS] 4H bullish bias
+[PASS] 1H bullish POI detected
+[PASS] 15M bullish CHOCH detected
+[PASS] 15M sell-side sweep detected
+[PASS] 10M bullish CHOCH detected
+[PASS] A+ BUY signal generated
+
+Important:
+The generated synthetic trade currently has a planned RR of about 0.12R
+because V4 currently falls back to the POI edge when no higher-timeframe
+structural target is available. Do NOT use this as evidence of profitability.
+The next development step is to define the target rule from the transcript,
+then add bearish and negative/failure scenarios.
